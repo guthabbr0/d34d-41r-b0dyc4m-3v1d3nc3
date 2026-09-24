@@ -1,16 +1,16 @@
 // Weapon handling: viewmodel (gun + IK arms), weapon-mounted light, firing/hitscan, recoil,
 // procedural reload / pump / switch / shove animations, ammo.
 import * as THREE from 'three';
-import { buildPistol, buildShotgun, buildArm, makeArmMesh, solveArmIK, weaponMaterials } from './weaponModels.js';
+import { buildPistol, buildShotgun, buildArm, makeArmMesh, solveArmIK, gripPose, weaponMaterials } from './weaponModels.js';
 import { markViewmodel } from '../engine/renderer.js';
 import { makeCharacterMaterial } from './humanoid.js';
 import { SURF } from './world.js';
 
 export const WEAPONS = {
   pistol: { name: 'P17 9mm', mag: 17, damage: 34, pellets: 1, spreadHip: 0.011, spreadAds: 0.0035, delay: 0.14, recoil: 0.032, force: 1.6, reload: 1.55, reloadEmpty: 1.9, auto: false, range: 80,
-    hip: new THREE.Vector3(0.075, -0.2, -0.40), ads: new THREE.Vector3(0.0, -0.078, -0.34), sound: 'pistol' },
+    hip: new THREE.Vector3(0.075, -0.2, -0.40), ads: new THREE.Vector3(0.0, -0.078, -0.42), sound: 'pistol' },
   shotgun: { name: 'M88 12GA', mag: 6, damage: 17, pellets: 9, spreadHip: 0.055, spreadAds: 0.042, delay: 0.95, recoil: 0.11, force: 2.6, reloadShell: 0.52, auto: false, range: 45,
-    hip: new THREE.Vector3(0.1, -0.19, -0.3), ads: new THREE.Vector3(0.0, -0.07, -0.22), sound: 'shotgun' },
+    hip: new THREE.Vector3(0.1, -0.2, -0.2), ads: new THREE.Vector3(0.0, -0.07, -0.2), sound: 'shotgun' },
 };
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler();
@@ -59,6 +59,7 @@ export class WeaponSystem {
     this.arms = {
       R_pistol: buildArm(-1, 'pistol', detail), L_support: buildArm(1, 'support', detail),
       R_wrist: buildArm(-1, 'wrist', detail), L_pump: buildArm(1, 'pump', detail),
+      L_grip: buildArm(1, 'pistol', detail),   // left fist for cutscenes (steering wheel)
     };
     this.armMeshes = {};
     this.armRoot = new THREE.Group();
@@ -322,7 +323,7 @@ export class WeaponSystem {
       const c = this.customArms(dt);
       for (const k in this.armMeshes) this.armMeshes[k].visible = false;
       if (c.R) { this.armMeshes.R_pistol.visible = true; solveArmIK(this.arms.R_pistol, null, c.R.shoulder, c.R.wrist, c.R.pole, c.R.quat); }
-      if (c.L) { this.armMeshes.L_support.visible = true; solveArmIK(this.arms.L_support, null, c.L.shoulder, c.L.wrist, c.L.pole, c.L.quat); }
+      if (c.L) { const k = c.L.arm || 'L_support'; this.armMeshes[k].visible = true; solveArmIK(this.arms[k], null, c.L.shoulder, c.L.wrist, c.L.pole, c.L.quat); }
       this.armRoot.updateMatrixWorld(true);
       this._customWas = true;
       return;
@@ -416,22 +417,34 @@ export class WeaponSystem {
     const gq = gun.getWorldQuaternion(A.gq);
     const lo = A.lo.copy(leftOff).applyQuaternion(p.aimQuat);
     if (this.current === 'pistol') {
-      body(A.shR, -0.26, -0.02, 0.2); body(A.shL, 0.26, -0.02, 0.2);
-      // right hand: wrist behind/right of the grip, hand frame rotated to face forward
-      const hqR = A.hqR.copy(gq).multiply(GRIP_TILT).multiply(FLIP_Y);
-      A.wR.set(0.028, -0.058, 0.07).applyMatrix4(gun.matrixWorld);
-      solveArmIK(this.arms.R_pistol, null, A.shR, A.wR, body(A.pole, -0.55, -0.6, 0.2), hqR);
-      const hqL = leftAway > 0.3 ? A.hqL.copy(p.aimQuat).multiply(FLIP_Y) : A.hqL.copy(hqR).multiply(SUPPORT_ROLL);
-      A.wL.set(-0.046, -0.072, 0.06).applyMatrix4(gun.matrixWorld).add(lo);
-      solveArmIK(this.arms.L_support, null, A.shL, A.wL, body(A.pole, 0.55, -0.6, 0.2), hqL);
+      // shoulders relative to the chest camera; they drop as the arms extend to aim so the forearms rise
+      // into frame from below instead of sweeping past the lens
+      const k = ease(p.ads), sx = 0.2 - 0.01 * k, sy = -0.08 - 0.18 * k, sz = 0.12 - 0.07 * k;
+      body(A.shR, sx, sy, sz); body(A.shL, -sx, sy, sz);   // camera +x is the officer's right
+      // right fist wraps the grip: bar = the grip's own axis (tilted back 0.32 rad), approached from
+      // behind-right so the palm sits on the backstrap and the fingers close over the front strap
+      const axis = A.axis.copy(PISTOL_GRIP_AXIS).applyQuaternion(gq);
+      A.bar.copy(PISTOL_GRIP_POINT).applyMatrix4(gun.matrixWorld);
+      gripPose('pistol', -1, A.bar, axis, A.app.set(-0.42, 0, -1).applyQuaternion(gq), A.wR, A.hqR);
+      solveArmIK(this.arms.R_pistol, null, A.shR, A.wR, body(A.pole, 0.5, -0.65, 0.15), A.hqR);
+      // support fist wraps the gun hand's fingers from the front-left (thumbs forward)
+      A.bar.copy(PISTOL_SUPPORT_POINT).applyMatrix4(gun.matrixWorld);
+      gripPose('support', 1, A.bar, axis, A.app.set(0.62, 0, -1).applyQuaternion(gq), A.wL, A.hqL);
+      if (leftAway > 0.3) A.hqL.copy(p.aimQuat).multiply(FLIP_Y);   // reload: hand leaves the gun
+      A.wL.add(lo);
+      solveArmIK(this.arms.L_support, null, A.shL, A.wL, body(A.pole, -0.5, -0.65, 0.15), A.hqL);
     } else {
-      body(A.shR, -0.26, -0.02, 0.22); body(A.shL, 0.26, -0.02, 0.2);
-      const hqR = A.hqR.copy(gq).multiply(STOCK_TILT).multiply(FLIP_Y);
-      A.wR.set(0.03, -0.075, 0.1).applyMatrix4(gun.matrixWorld);
-      solveArmIK(this.arms.R_wrist, null, A.shR, A.wR, body(A.pole, -0.6, -0.6, 0.1), hqR);
+      // bladed stance: support shoulder forward so the left hand reaches the pump, stock in the
+      // firing-side shoulder pocket
+      body(A.shR, 0.2, -0.07, 0.16); body(A.shL, -0.17, -0.1, -0.02);
+      // right fist around the stock's wrist: index toward the trigger, pinky down the comb
+      const axis = A.axis.copy(STOCK_WRIST_AXIS).applyQuaternion(gq);
+      A.bar.copy(STOCK_WRIST_POINT).applyMatrix4(gun.matrixWorld);
+      gripPose('wrist', -1, A.bar, axis, A.app.set(-1, 0.15, 0.25).applyQuaternion(gq), A.wR, A.hqR);
+      solveArmIK(this.arms.R_wrist, null, A.shR, A.wR, body(A.pole, 0.55, -0.7, 0.2), A.hqR);
       const hqL = A.hqL.copy(gq).multiply(FLIP_Y);
       A.wL.set(0.0, -0.035, ud.pump.position.z + 0.075).applyMatrix4(gun.matrixWorld).add(lo);
-      solveArmIK(this.arms.L_pump, null, A.shL, A.wL, body(A.pole, 0.6, -0.7, 0.3), hqL);
+      solveArmIK(this.arms.L_pump, null, A.shL, A.wL, body(A.pole, -0.55, -0.75, 0.2), hqL);
     }
     this.armRoot.updateMatrixWorld(true);
   }
@@ -443,12 +456,16 @@ export class WeaponSystem {
 }
 const UP = new THREE.Vector3(0, 1, 0);
 const FLIP_Y = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI);
-const GRIP_TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.32);
-const STOCK_TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.6);
-const SUPPORT_ROLL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.25);
 const _arm = {
   gq: new THREE.Quaternion(), hqR: new THREE.Quaternion(), hqL: new THREE.Quaternion(),
   shR: new THREE.Vector3(), shL: new THREE.Vector3(), wR: new THREE.Vector3(), wL: new THREE.Vector3(),
-  pole: new THREE.Vector3(), lo: new THREE.Vector3(),
+  pole: new THREE.Vector3(), lo: new THREE.Vector3(), axis: new THREE.Vector3(), bar: new THREE.Vector3(), app: new THREE.Vector3(),
 };
+// pistol grip in gun space (buildPistol: grip centred at (0, -0.048, 0.012), rotated -0.32 rad about X)
+const PISTOL_GRIP_AXIS = new THREE.Vector3(0, Math.cos(0.32), -Math.sin(0.32));
+const PISTOL_GRIP_POINT = new THREE.Vector3(0, -0.06, 0.016);        // middle of the four fingers
+// shotgun stock wrist (buildShotgun: extruded stock profile, narrowest behind the trigger group)
+const STOCK_WRIST_AXIS = new THREE.Vector3(0, 0.55, -0.83).normalize();
+const STOCK_WRIST_POINT = new THREE.Vector3(0, -0.018, 0.075);
+const PISTOL_SUPPORT_POINT = new THREE.Vector3(0.004, -0.066, 0.002); // over the gun hand's fingers
 function p0Blocked(ws) { const p = ws.player; return !!p.grabbedBy || !p.alive; }

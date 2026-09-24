@@ -5,6 +5,7 @@ import { BI } from './humanoid.js';
 import { Pose, applyPose, poseFeed, poseIdle, poseShamble, poseRise } from './anim.js';
 import { Body, makeCharacterMaterial } from './humanoid.js';
 import { buildVan } from './props.js';
+import { gripPose } from './weaponModels.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
@@ -231,20 +232,28 @@ export class Story {
     this.cam.set(seat, new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.14, -Math.PI / 2, 0, 'YXZ')));
     // hands at ten and two on the wheel
     const wheel = car.userData.steering;
-    // (persistent targets: this runs every frame of the drive, so nothing is allocated in it)
-    const carQ = new THREE.Quaternion(), _tmp = new THREE.Vector3();
-    const gripQ = [1, -1].map(side => new THREE.Quaternion().setFromEuler(new THREE.Euler(side * 0.5, Math.PI / 2, -0.6, 'YXZ')));
+    // Hands at ten and two: each fist closes around the rim (torus r = 0.19 m in the wheel's local YZ
+    // plane, driver on its -X side). Bar = rim tangent at the grip point, approached from the driver's
+    // side and slightly outside the rim so the thumbs sit on the inner edge. Persistent targets: this
+    // runs every frame of the drive, so nothing is allocated in it.
+    const wheelQ = new THREE.Quaternion(), rimP = new THREE.Vector3(), tan = new THREE.Vector3(), app = new THREE.Vector3();
     const arm = () => ({ shoulder: new THREE.Vector3(), wrist: new THREE.Vector3(), pole: new THREE.Vector3(), quat: new THREE.Quaternion() });
-    const targets = { R: arm(), L: arm() }, both = [targets.R, targets.L];
+    const targets = { R: arm(), L: { ...arm(), arm: 'L_grip' } }, both = [targets.R, targets.L];
+    const TH = Math.atan2(0.1, 0.16);   // 32 degrees above horizontal: ten and two
     w.customArms = () => {
       car.updateMatrixWorld();
-      car.getWorldQuaternion(carQ);
+      wheel.getWorldQuaternion(wheelQ);
       for (let i = 0; i < 2; i++) {
-        const t = both[i], side = i === 0 ? 1 : -1;
-        t.shoulder.set(-0.34, 1.1, -0.42 + side * 0.3).applyMatrix4(car.matrixWorld);
-        t.wrist.set(0, 0.1, side * 0.16).applyMatrix4(wheel.matrixWorld).add(_tmp.set(-0.07, -0.02, side * 0.03).applyQuaternion(carQ));
-        t.pole.set(-0.1, 0.5, side > 0 ? 0.5 : -1.4).applyMatrix4(car.matrixWorld);
-        t.quat.copy(carQ).multiply(gripQ[i]);
+        const t = both[i], side = i === 0 ? 1 : -1;         // wheel side: +1 = driver's right
+        const sn = Math.sin(TH), cs = Math.cos(TH);
+        rimP.set(0, 0.19 * sn, side * 0.19 * cs).applyMatrix4(wheel.matrixWorld);
+        tan.set(0, cs, -side * sn).applyQuaternion(wheelQ);                   // along the rim, toward 12 o'clock
+        app.set(0.85, -0.45 * sn, -0.45 * side * cs).applyQuaternion(wheelQ); // from the seat, from outside the rim
+        gripPose('pistol', -side, rimP, tan, app, t.wrist, t.quat);           // arm side: -1 right, +1 left
+        // seated driver: shoulders just behind and above the chest camera, elbows low and out, so the
+        // bent arms rise into frame from below instead of locking straight at lens height
+        t.shoulder.set(-0.14, 1.1, -0.42 + side * 0.2).applyMatrix4(car.matrixWorld);
+        t.pole.set(-0.1, 0.15, -0.42 + side * 0.8).applyMatrix4(car.matrixWorld);
       }
       return targets;
     };

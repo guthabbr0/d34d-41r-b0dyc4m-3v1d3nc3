@@ -142,6 +142,29 @@ export function buildShotgun() {
 // ------------------------------------------------------------------ viewmodel arm
 // Skinned arm with 3 bones along +Z: upper (shoulder), fore (elbow), hand (wrist). Gloved, uniform sleeve.
 // grip: 'pistol' (vertical handle, right), 'support' (wraps over), 'pump' (horizontal cylinder, palm up)
+// Handle radius each closed-fist hand is sculpted around: the pistol grip (29 x 48 mm), the support
+// hand wrapping the gun hand's fingers, the shotgun wrist.
+export const GRIP_R = { pistol: 0.022, support: 0.03, wrist: 0.024 };
+const _gY = new THREE.Vector3(), _gA = new THREE.Vector3(), _gE = new THREE.Vector3(), _gX = new THREE.Vector3(), _gZ = new THREE.Vector3(), _gM = new THREE.Matrix4();
+// Pose a closed-fist hand around a bar (pistol grip, steering-wheel rim...). The fist in buildArm has
+// its knuckles stacked along hand +Y and the bar centre at (inner*(0.024 + R*0.4), 0, 0.075) from the
+// wrist, so given the bar's axis, a point on it and the direction the hand approaches from
+// (wrist -> bar), the hand rotation and wrist position follow exactly. Writes outWrist/outQuat.
+export function gripPose(grip, side, barPoint, barAxis, approach, outWrist, outQuat) {
+  const inner = -side, R = GRIP_R[grip];
+  const ox = inner * (0.024 + R * 0.4), oz = 0.075, len = Math.hypot(ox, oz);
+  const sgn = Math.sign(ox), sinP = Math.abs(ox) / len, cosP = oz / len;
+  const Y = _gY.copy(barAxis).normalize();
+  const a = _gA.copy(approach).addScaledVector(Y, -approach.dot(Y)).normalize();   // wrist -> bar, across the bar
+  const e = _gE.crossVectors(Y, a);
+  const Z = _gZ.copy(a).multiplyScalar(cosP).addScaledVector(e, -sgn * sinP);
+  const X = _gX.copy(a).multiplyScalar(sgn * sinP).addScaledVector(e, cosP);
+  outQuat.setFromRotationMatrix(_gM.makeBasis(X, Y, Z));
+  outWrist.copy(barPoint).addScaledVector(a, -len);
+  if (grip === 'support') outWrist.addScaledVector(Y, 0.01);   // its finger stack sits 1 cm lower
+  return outWrist;
+}
+
 export function buildArm(side, grip, detail = 1) {
   const s = side;           // +1 left arm, -1 right arm (character sides)
   const U = 0.29, F = 0.26;
@@ -161,7 +184,7 @@ export function buildArm(side, grip, detail = 1) {
   if (grip === 'pistol' || grip === 'support' || grip === 'wrist') {
     // palm slab, knuckles vertical (fist around a vertical handle to the inner side)
     const inner = -s; // direction toward the handle (x)
-    const R = grip === 'support' ? 0.03 : 0.017;   // handle radius
+    const R = GRIP_R[grip];   // handle radius the fist is sculpted around (see gripPose)
     const cx = inner * (0.024 + R * 0.4), cz = 0.075;   // handle centre relative to wrist
     prims.push({ t: 'box', c: H(inner * 0.004, -0.004, 0.045), s: [0.016, 0.043, 0.042], r: 0.013, bone: B.hand, k: 0.012, mat: 7 });
     for (let f = 0; f < 4; f++) {
