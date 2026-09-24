@@ -49,7 +49,7 @@ function emitSite() {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   if (!html.includes('src="build/game.js"')) throw new Error('index.html no longer loads build/game.js');
   fs.writeFileSync(path.join(out, 'index.html'), html.replace('src="build/game.js"', `src="${bundle}"`));
-  for (const dir of ['tex', 'models', 'hdri']) fs.cpSync(path.join(root, 'assets', dir), path.join(out, 'assets', dir), { recursive: true });
+  for (const dir of ['tex', 'models', 'hdri', 'enemies']) fs.cpSync(path.join(root, 'assets', dir), path.join(out, 'assets', dir), { recursive: true });
   // recorded voice and sound packs, when present (docs/voice/HANDOFF.md)
   for (const dir of ['voice', 'sfx']) if (fs.existsSync(path.join(root, 'assets', dir))) fs.cpSync(path.join(root, 'assets', dir), path.join(out, 'assets', dir), { recursive: true });
   // icons (regenerate the raster ones with tools/make_favicon.mjs after editing favicon.svg)
