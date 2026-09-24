@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Dead Air</title>
+<meta name="description" content="DEAD AIR — a bodycam-footage zombie shooter that runs in the browser.">
+<meta name="theme-color" content="#07090c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --ink: #07090c;
+  --ink-2: #0d1116;
+  --panel: rgba(9, 12, 16, 0.84);
+  --panel-solid: #0c1015;
+  --line: rgba(233, 230, 220, 0.14);
+  --line-2: rgba(233, 230, 220, 0.28);
+  --paper: #e9e6dc;
+  --mute: #8d949d;
+  --dim: #5d646d;
+  --tape: #f2c230;
+  --tape-ink: #1a1400;
+  --rec: #e2402f;
+  --ok: #7fd08a;
+  --display: 'Big Shoulders Display', 'Arial Narrow', 'Roboto Condensed', Impact, sans-serif;
+  --sans: 'IBM Plex Sans Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px);
+}
+html, body { height: 100%; margin: 0; background: var(--ink); color: var(--paper); overflow: hidden; overscroll-behavior: none; }
+body { font-family: var(--sans); font-size: 15px; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none; -webkit-user-select: none; }
+[hidden] { display: none !important; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #000; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#ui > * { pointer-events: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--tape); outline-offset: 2px; }
+
+/* ---------------- burned-in bodycam overlay (Axon-style) ---------------- */
+.bc { position: absolute; inset: 0; font-family: var(--sans); font-weight: 700; color: #fff; letter-spacing: 0.02em;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 2px #000; }
+.bc-tr { position: absolute; top: calc(12px + var(--sat)); right: calc(16px + var(--sar)); text-align: right; font-size: clamp(12px, 1.55vw, 20px); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.bc-tl { position: absolute; top: calc(12px + var(--sat)); left: calc(16px + var(--sal)); font-size: clamp(11px, 1.3vw, 16px); display: flex; gap: 8px; align-items: center; }
+.rec-dot { width: 0.7em; height: 0.7em; border-radius: 50%; background: var(--rec); box-shadow: 0 0 6px rgba(226,64,47,.8); animation: blink 1s steps(2, start) infinite; }
+.bc-buffer { color: #ffd66b; }
+@keyframes blink { to { visibility: hidden; } }
+
+/* ---------------- HUD ---------------- */
+#hud { position: absolute; inset: 0; }
+#objective { position: absolute; left: calc(18px + var(--sal)); top: calc(46px + var(--sat)); max-width: min(46vw, 420px); font-family: var(--mono); font-size: clamp(11px, 1.15vw, 14px); color: var(--paper); opacity: 0; transition: opacity .6s;
+  background: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,0)); padding: 6px 12px 6px 10px; border-left: 2px solid var(--tape); }
+#objective.show { opacity: 1; }
+#objective b { display: block; font-weight: 600; font-size: .8em; letter-spacing: .14em; color: var(--tape); margin-bottom: 2px; }
+#notify { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-family: var(--mono); font-size: clamp(12px, 1.3vw, 15px); text-align: center; color: var(--paper); text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+#notify.show { opacity: 1; }
+#ammo { position: absolute; right: calc(20px + var(--sar)); bottom: calc(18px + var(--sab)); text-align: right; font-family: var(--mono); color: var(--paper); text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; opacity: .92; }
+#ammoMag { font-size: clamp(22px, 2.6vw, 34px); font-weight: 600; }
+#ammoRes { font-size: clamp(13px, 1.3vw, 17px); color: var(--mute); margin-left: 6px; }
+#ammoName { font-size: 11px; letter-spacing: .16em; color: var(--mute); }
+#ammo.low #ammoMag { color: var(--rec); }
+#cross { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 0 1px rgba(0,0,0,.6); transition: opacity .15s; }
+#hitmark { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; opacity: 0; transition: opacity .15s; }
+#hitmark::before, #hitmark::after { content: ''; position: absolute; left: 50%; top: 0; width: 2px; height: 100%; margin-left: -1px; background: #fff; transform: rotate(45deg); box-shadow: 0 0 2px #000; }
+#hitmark::after { transform: rotate(-45deg); }
+#hitmark.kill::before, #hitmark.kill::after { background: var(--rec); }
+#prompt { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); font-family: var(--mono); font-size: clamp(12px, 1.2vw, 15px); padding: 6px 12px; background: rgba(0,0,0,.55); border: 1px solid var(--line-2); opacity: 0; transition: opacity .2s; white-space: nowrap; }
+#prompt.show { opacity: 1; }
+#prompt kbd { font-family: var(--mono); background: var(--paper); color: var(--ink); padding: 0 6px; margin-right: 8px; font-weight: 600; }
+#qte { position: absolute; left: 50%; top: 64%; transform: translateX(-50%); text-align: center; display: none; }
+#qte.show { display: block; animation: shake .12s infinite; }
+.qte-label { font-family: var(--display); font-weight: 900; font-size: clamp(22px, 3vw, 38px); letter-spacing: .06em; color: #fff; text-shadow: 0 2px 6px #000; }
+.qte-key { display: inline-block; margin: 6px 0; font-family: var(--mono); font-weight: 600; font-size: 18px; background: var(--tape); color: var(--tape-ink); padding: 2px 12px; }
+.qte-bar { width: min(40vw, 320px); height: 6px; background: rgba(255,255,255,.2); margin: 4px auto 0; }
+.qte-bar i { display: block; height: 100%; width: 0; background: var(--tape); }
+@keyframes shake { 0%{transform:translate(-50%,0)} 50%{transform:translate(calc(-50% + 2px),-1px)} 100%{transform:translate(calc(-50% - 2px),1px)} }
+#fps { position: absolute; left: calc(16px + var(--sal)); bottom: calc(10px + var(--sab)); font-family: var(--mono); font-size: 11px; color: var(--mute); text-shadow: 0 1px 2px #000; }
+
+/* subtitles */
+#subs { position: absolute; left: 50%; bottom: calc(12% + var(--sab)); transform: translateX(-50%); width: min(78vw, 820px); text-align: center; opacity: 0; transition: opacity .25s; }
+#subs.show { opacity: 1; }
+#subs span { display: inline; font-size: clamp(14px, 1.7vw, 20px); line-height: 1.5; background: rgba(0,0,0,.66); padding: 2px 8px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+#subs b { font-family: var(--mono); font-weight: 600; font-size: .78em; letter-spacing: .1em; color: var(--tape); margin-right: 6px; }
+#subs.radio b::before { content: '◉ '; color: var(--rec); }
+
+/* title card / evidence text */
+#card { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .8s; background: #000; }
+#card.show { opacity: 1; }
+#card.clear { background: transparent; }
+#card pre { font-family: var(--mono); font-size: clamp(12px, 1.5vw, 17px); line-height: 1.75; color: var(--paper); white-space: pre-wrap; max-width: min(88vw, 760px); margin: 0 16px; }
+#card pre .hl { color: var(--tape); }
+#card .caret { display: inline-block; width: .6em; height: 1.1em; background: var(--paper); vertical-align: -0.2em; animation: blink 1s steps(2,start) infinite; }
+#skip { position: absolute; right: calc(20px + var(--sar)); bottom: calc(18px + var(--sab)); font-family: var(--mono); font-size: 12px; color: var(--mute); letter-spacing: .08em; opacity: 0; transition: opacity .3s; display: flex; gap: 8px; align-items: center; }
+#skip.show { opacity: 1; }
+#skip .ring { width: 18px; height: 18px; }
+#playback { position: absolute; left: 50%; bottom: calc(10px + var(--sab)); transform: translateX(-50%); font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: rgba(233,230,220,.55); }
+
+/* ---------------- touch controls ---------------- */
+#touch { position: absolute; inset: 0; pointer-events: auto; }
+#stick { position: absolute; left: 0; top: 0; width: 140px; height: 140px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.28); background: radial-gradient(circle, rgba(255,255,255,.06), rgba(255,255,255,.02)); opacity: 0; transition: opacity .15s; transform: translate(calc(90px + var(--sal)), calc(100vh - 230px)); }
+#stick.active { opacity: 1; }
+#stickKnob { position: absolute; left: 44px; top: 44px; width: 52px; height: 52px; border-radius: 50%; background: rgba(233,230,220,.32); border: 1px solid rgba(255,255,255,.5); }
+.tb { position: absolute; width: 58px; height: 58px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.34); background: rgba(10,12,16,.38); color: rgba(255,255,255,.9); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .06em; display: flex; align-items: center; justify-content: center; text-align: center; pointer-events: auto; backdrop-filter: blur(2px); }
+.tb svg { width: 24px; height: 24px; }
+.tb.down { background: rgba(242,194,48,.35); border-color: var(--tape); }
+.tb.on { border-color: var(--tape); color: var(--tape); }
+.tb.big { width: 84px; height: 84px; }
+#tFire { right: calc(34px + var(--sar)); bottom: calc(46px + var(--sab)); }
+#tAim { right: calc(130px + var(--sar)); bottom: calc(26px + var(--sab)); }
+#tReload { right: calc(128px + var(--sar)); bottom: calc(102px + var(--sab)); }
+#tShove { right: calc(40px + var(--sar)); bottom: calc(146px + var(--sab)); }
+#tLight { right: calc(24px + var(--sar)); top: calc(96px + var(--sat)); width: 48px; height: 48px; }
+#tSwap { right: calc(84px + var(--sar)); top: calc(96px + var(--sat)); width: 48px; height: 48px; }
+#tUse { right: calc(206px + var(--sar)); bottom: calc(76px + var(--sab)); border-color: var(--tape); color: var(--tape); }
+#tSprint { left: calc(26px + var(--sal)); bottom: calc(26px + var(--sab)); width: 48px; height: 48px; }
+#tPause { left: calc(12px + var(--sal)); top: calc(44px + var(--sat)); width: 40px; height: 40px; font-size: 16px; }
+#touch.ads #tFire { border-color: var(--tape); }
+body.touch #ammo { bottom: calc(150px + var(--sab)); right: calc(24px + var(--sar)); }
+body.touch #objective { top: calc(92px + var(--sat)); }
+body.touch #prompt kbd { display: none; }
+
+/* ---------------- screens ---------------- */
+.screen { position: absolute; inset: 0; pointer-events: auto !important; display: flex; }
+.screen.dim { background: radial-gradient(ellipse at 70% 50%, rgba(7,9,12,.35), rgba(7,9,12,.88) 70%); }
+.btn { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: baseline; width: 100%; text-align: left; padding: 10px 14px; border: 1px solid transparent; font-family: var(--sans); font-weight: 600; font-size: clamp(15px, 1.7vw, 19px); letter-spacing: .04em; color: var(--paper); text-transform: uppercase; transition: background .15s, border-color .15s, color .15s; }
+.btn small { grid-column: 2; font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: .06em; color: var(--mute); text-transform: none; }
+.btn .idx { font-family: var(--mono); font-size: 11px; color: var(--dim); min-width: 2.2em; }
+.btn:hover, .btn:focus-visible { background: rgba(242,194,48,.1); border-color: rgba(242,194,48,.5); outline: none; }
+.btn:hover .idx, .btn:focus-visible .idx { color: var(--tape); }
+.btn.primary { background: var(--tape); color: var(--tape-ink); }
+.btn.primary .idx, .btn.primary small { color: rgba(26,20,0,.65); }
+.btn.primary:hover { background: #ffd349; }
+.btn[disabled] { opacity: .35; pointer-events: none; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--mute); text-transform: uppercase; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; padding: 2px 6px; border: 1px solid var(--line-2); color: var(--mute); }
+.tag.hot { border-color: var(--rec); color: var(--rec); }
+
+/* gate */
+#gate { align-items: center; justify-content: center; background: #000; padding-inline: 20px; }
+#gate .inner { max-width: 560px; text-align: center; display: flex; flex-direction: column; gap: 18px; align-items: center; }
+#gate h1 { font-family: var(--display); font-weight: 900; font-size: clamp(48px, 9vw, 96px); line-height: .85; letter-spacing: .01em; margin: 0; }
+#gate h1 span { color: var(--rec); }
+#gate p { color: var(--mute); line-height: 1.6; margin: 0; font-size: 14px; }
+#gate .go { margin-top: 6px; width: auto; justify-content: center; padding: 12px 26px; }
+#gate .fine { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+
+/* loading */
+#loading { background: var(--ink); align-items: center; justify-content: center; padding-inline: 20px; }
+#loading .inner { width: min(640px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.sys { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.sys strong { font-family: var(--mono); font-weight: 600; font-size: 12px; letter-spacing: .2em; }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 18px; font-family: var(--mono); font-size: 12px; }
+.meta dt { color: var(--mute); }
+.meta dd { margin: 0; color: var(--paper); font-variant-numeric: tabular-nums; }
+.bar { height: 3px; background: var(--line); position: relative; overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--tape); transition: width .2s; }
+#log { font-family: var(--mono); font-size: 11.5px; line-height: 1.7; color: var(--mute); height: 8.5em; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+#log .ok { color: var(--ok); }
+#hash { font-family: var(--mono); font-size: 11px; color: var(--dim); word-break: break-all; }
+
+/* main menu */
+#menu { padding: calc(24px + var(--sat)) calc(24px + var(--sar)) calc(24px + var(--sab)) calc(28px + var(--sal)); gap: 28px; align-items: stretch; justify-content: space-between; }
+#menu .left { display: flex; flex-direction: column; justify-content: center; gap: 20px; width: min(420px, 48vw); }
+.logo { display: flex; flex-direction: column; gap: 6px; }
+.logo h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: clamp(56px, 8.5vw, 116px); line-height: .82; letter-spacing: .005em; text-transform: uppercase; text-shadow: 0 2px 24px rgba(0,0,0,.6); }
+.logo h1 em { font-style: normal; color: transparent; -webkit-text-stroke: 1.5px var(--paper); }
+.logo .sub { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; color: var(--paper); opacity: .8; }
+#menuList { display: flex; flex-direction: column; gap: 2px; }
+#menu .right { width: min(360px, 38vw); align-self: flex-end; background: var(--panel); border: 1px solid var(--line); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; backdrop-filter: blur(6px); }
+.evtag { display: flex; justify-content: space-between; align-items: center; }
+.evtag .no { font-family: var(--display); font-weight: 900; font-size: 30px; line-height: 1; }
+.summary { font-size: 13px; line-height: 1.55; color: var(--paper); opacity: .85; margin: 0; }
+.menu-foot { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+
+/* panels (settings/controls/credits/pause/over) */
+.modal { align-items: center; justify-content: center; background: rgba(4,5,7,.72); padding: calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal)); }
+.panel { width: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column; background: var(--panel-solid); border: 1px solid var(--line); }
+.panel header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); gap: 12px; }
+.panel header h2 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 28px; letter-spacing: .02em; text-transform: uppercase; }
+.panel .body { overflow-y: auto; padding: 8px 18px 16px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.panel footer { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.panel footer .btn { width: auto; }
+.tabs { display: flex; gap: 4px; padding: 10px 18px 0; flex-wrap: wrap; }
+.tabs button { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; padding: 7px 12px; color: var(--mute); border-bottom: 2px solid transparent; text-transform: uppercase; }
+.tabs button[aria-selected="true"] { color: var(--paper); border-bottom-color: var(--tape); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.row label { font-size: 14px; }
+.row label small { display: block; color: var(--mute); font-size: 12px; margin-top: 2px; line-height: 1.35; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button { font-family: var(--mono); font-size: 12px; padding: 6px 10px; border: 1px solid var(--line-2); color: var(--mute); text-transform: uppercase; letter-spacing: .06em; }
+.seg button[aria-pressed="true"] { background: var(--tape); border-color: var(--tape); color: var(--tape-ink); font-weight: 600; }
+.range { display: flex; align-items: center; gap: 10px; }
+.range input { flex: 1; accent-color: var(--tape); min-width: 0; }
+.range output { font-family: var(--mono); font-size: 12px; min-width: 3.4em; text-align: right; color: var(--paper); font-variant-numeric: tabular-nums; }
+.note { font-family: var(--mono); font-size: 11px; color: var(--mute); padding: 10px 0 0; line-height: 1.6; }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; font-size: 14px; padding: 10px 0; }
+.keys kbd { font-family: var(--mono); font-size: 12px; background: rgba(233,230,220,.1); border: 1px solid var(--line-2); padding: 2px 7px; white-space: nowrap; }
+.credits p { line-height: 1.6; color: var(--paper); opacity: .88; max-width: 62ch; }
+.credits h3 { font-family: var(--mono); font-weight: 600; font-size: 12px; letter-spacing: .16em; color: var(--tape); margin: 18px 0 6px; }
+
+#pause .panel, #over .panel { width: min(440px, 100%); }
+#over { background: rgba(0,0,0,.55); }
+#over h2 { color: var(--rec); }
+#ending { background: #000; align-items: center; justify-content: center; padding-inline: 20px; }
+#ending .inner { max-width: 640px; display: flex; flex-direction: column; gap: 16px; }
+#ending h2 { margin: 0; font-family: var(--display); font-weight: 900; font-size: clamp(40px, 7vw, 76px); line-height: .9; }
+#ending p { line-height: 1.7; color: var(--paper); opacity: .88; margin: 0; }
+#ending .stats { font-family: var(--mono); font-size: 12px; color: var(--mute); display: flex; gap: 18px; flex-wrap: wrap; }
+#ending .btn { width: auto; align-self: flex-start; }
+
+#rotate { position: absolute; inset: 0; background: #000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; pointer-events: auto !important; font-family: var(--mono); font-size: 13px; letter-spacing: .12em; color: var(--paper); text-align: center; padding: 20px; z-index: 50; }
+#rotate svg { width: 64px; height: 64px; animation: rot 2.4s ease-in-out infinite; }
+@keyframes rot { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) { body.playing #rotate, body.needs-landscape #rotate { display: flex; } }
+
+@media (max-height: 460px) {
+  #menu .right { display: none; }
+  #menu .left { width: min(520px, 70vw); gap: 12px; }
+  .logo h1 { font-size: clamp(44px, 12vh, 80px); }
+  .btn { padding: 7px 12px; font-size: 15px; }
+  .panel header { padding: 8px 14px; }
+  .panel header h2 { font-size: 22px; }
+  .row { padding: 7px 0; }
+}
+@media (max-width: 640px) {
+  #menu { flex-direction: column; }
+  #menu .left, #menu .right { width: 100%; }
+  .row { grid-template-columns: 1fr; gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { .rec-dot, #qte.show, #rotate svg { animation: none; } }
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Game view"></canvas>
+<div id="ui">
+  <div id="overlay" class="bc" hidden>
+    <div class="bc-tl"><span class="rec-dot"></span><span id="bcRec">REC</span></div>
+    <div class="bc-tr"><div id="bcModel">VANTA BW-4 X81A0924</div><div id="bcTime">2026-09-24 T03:13:41 -0500</div></div>
+  </div>
+  <div id="hud" hidden>
+    <div id="objective"><b>OBJECTIVE</b><span id="objText"></span></div>
+    <div id="notify"></div>
+    <div id="cross"></div>
+    <div id="hitmark"></div>
+    <div id="prompt"><kbd>E</kbd><span id="promptText"></span></div>
+    <div id="qte"><div class="qte-label">SHOVE IT OFF</div><div class="qte-key" id="qteKey">MASH V</div><div class="qte-bar"><i id="qteFill"></i></div></div>
+    <div id="ammo"><span id="ammoMag">17</span><span id="ammoRes">/ 34</span><div id="ammoName">P17 9MM</div></div>
+    <div id="fps" hidden></div>
+  </div>
+  <div id="subs"><span></span></div>
+  <div id="card"><pre></pre></div>
+  <div id="skip"><svg class="ring" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="rgba(233,230,220,.25)" stroke-width="2"/><circle id="skipRing" cx="10" cy="10" r="8" fill="none" stroke="#f2c230" stroke-width="2" stroke-dasharray="50.3" stroke-dashoffset="50.3" transform="rotate(-90 10 10)"/></svg><span id="skipText">HOLD SPACE TO SKIP</span></div>
+  <div id="playback" hidden></div>
+
+  <div id="touch" hidden>
+    <div id="stick" class="no-look"><div id="stickKnob"></div></div>
+    <button class="tb big" id="tFire" data-act="fire" data-look="1" aria-label="Fire"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg></button>
+    <button class="tb" id="tAim" data-act="aim" aria-label="Aim">AIM</button>
+    <button class="tb" id="tReload" data-act="reload" aria-label="Reload">RLD</button>
+    <button class="tb" id="tShove" data-act="shove" aria-label="Shove">SHOVE</button>
+    <button class="tb" id="tLight" data-act="light" aria-label="Flashlight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h10l-2 6H9z"/><path d="M9 9h6v11a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/></svg></button>
+    <button class="tb" id="tSwap" data-act="swap" aria-label="Switch weapon">SWAP</button>
+    <button class="tb" id="tUse" data-act="use" aria-label="Interact" hidden>USE</button>
+    <button class="tb" id="tSprint" data-act="sprint" aria-label="Sprint">RUN</button>
+    <button class="tb" id="tPause" data-act="pause" aria-label="Pause">II</button>
+  </div>
+
+  <section id="gate" class="screen">
+    <div class="inner">
+      <span class="tag hot">RESTRICTED EVIDENCE</span>
+      <h1>DEAD<br><span>AIR</span></h1>
+      <p>The following recording was recovered from a body-worn camera. It contains graphic violence, gore and disturbing scenes.</p>
+      <button class="btn primary go" id="gateGo" type="button">View recording</button>
+      <span class="fine" id="gateHint">Best with headphones · landscape on phones</span>
+    </div>
+  </section>
+
+  <section id="loading" class="screen" hidden>
+    <div class="inner">
+      <div class="sys"><strong>EVIDEX · DIGITAL EVIDENCE</strong><span class="eyebrow">Case 26-0924-0317</span></div>
+      <dl class="meta">
+        <dt>Item</dt><dd>14-B · Body-worn camera footage</dd>
+        <dt>Device</dt><dd>VANTA BW-4 · SN X81A0924</dd>
+        <dt>Custodian</dt><dd>Keston City PD · Property &amp; Evidence</dd>
+        <dt>Status</dt><dd id="loadStatus">Decoding…</dd>
+      </dl>
+      <div class="bar"><i id="loadBar"></i></div>
+      <div id="log"></div>
+      <div id="hash"></div>
+    </div>
+  </section>
+
+  <section id="menu" class="screen dim" hidden>
+    <div class="left">
+      <div class="logo">
+        <span class="eyebrow">Evidence item 14-B · Body-worn camera</span>
+        <h1>Dead<br><em>Air</em></h1>
+        <span class="sub">KESTON CITY PD · 2250 WEXLEY AVE · 03:14</span>
+      </div>
+      <nav id="menuList">
+        <button class="btn primary" id="mPlay" type="button"><span class="idx">01</span>Play recording<small>Start from the beginning</small></button>
+        <button class="btn" id="mResume" type="button" hidden><span class="idx">02</span>Resume from marker<small id="mResumeWhere"></small></button>
+        <button class="btn" id="mSettings" type="button"><span class="idx">03</span>Settings<small id="mQuality">Graphics · camera · audio</small></button>
+        <button class="btn" id="mControls" type="button"><span class="idx">04</span>Controls</button>
+        <button class="btn" id="mCredits" type="button"><span class="idx">05</span>Credits</button>
+      </nav>
+      <span class="menu-foot" id="menuFoot"></span>
+    </div>
+    <aside class="right">
+      <div class="evtag"><span class="no">14-B</span><span class="tag hot">Restricted</span></div>
+      <dl class="meta">
+        <dt>Officer</dt><dd>R. Halloran #4471</dd>
+        <dt>Unit</dt><dd>21-Adam-14 · East Dist.</dd>
+        <dt>Call</dt><dd>415 disturbance / 245</dd>
+        <dt>Location</dt><dd>Harlan Court Apts, 1C</dd>
+        <dt>Recorded</dt><dd>2026-09-24 03:13</dd>
+        <dt>Duration</dt><dd>00:24:51</dd>
+        <dt>Integrity</dt><dd style="color:var(--ok)">SHA-256 verified</dd>
+      </dl>
+      <p class="summary">Unit 14 responded alone to a reported assault in progress. The recording ends 24 minutes later. It has not been released to the public.</p>
+    </aside>
+  </section>
+
+  <section id="settings" class="screen modal" hidden>
+    <div class="panel" role="dialog" aria-labelledby="setTitle">
+      <header><h2 id="setTitle">Settings</h2><span class="eyebrow" id="setGpu"></span></header>
+      <div class="tabs" role="tablist" id="setTabs"></div>
+      <div class="body" id="setBody"></div>
+      <footer><button class="btn" id="setDefaults" type="button">Reset to detected</button><button class="btn primary" id="setClose" type="button">Done</button></footer>
+    </div>
+  </section>
+
+  <section id="controls" class="screen modal" hidden>
+    <div class="panel">
+      <header><h2>Controls</h2></header>
+      <div class="body">
+        <div class="keys" id="keysKbm">
+          <kbd>W A S D</kbd><span>Move · hold <b>Shift</b> to run</span>
+          <kbd>Mouse</kbd><span>Look / aim</span>
+          <kbd>Left click</kbd><span>Fire (hold for steady fire with the pistol)</span>
+          <kbd>Right click</kbd><span>Aim down sights</span>
+          <kbd>R</kbd><span>Reload (shotgun: fire to interrupt)</span>
+          <kbd>F</kbd><span>Weapon light on/off</span>
+          <kbd>E</kbd><span>Use · open doors · pick up</span>
+          <kbd>V</kbd><span>Shove · mash to break free when grabbed</span>
+          <kbd>Q · 1 · 2 · wheel</kbd><span>Switch weapon</span>
+          <kbd>Esc</kbd><span>Pause</span>
+          <kbd>Space (hold)</kbd><span>Skip cutscene</span>
+        </div>
+        <p class="note">Touch: left side is a floating stick (push to the edge to run), drag anywhere on the right to look, the fire button also aims while you drag it. Gamepads work too: sticks, RT fire, LT aim, X reload, B shove, A use, Y switch, RB light.</p>
+      </div>
+      <footer><button class="btn primary" data-close type="button">Back</button></footer>
+    </div>
+  </section>
+
+  <section id="credits" class="screen modal" hidden>
+    <div class="panel">
+      <header><h2>Credits</h2></header>
+      <div class="body credits">
+        <p>DEAD AIR is a short horror shooter presented as recovered body-worn camera footage. Everything in it runs live in your browser: the city block, the rain, the people, the sound.</p>
+        <h3>WHAT IS PROCEDURAL</h3>
+        <p>Every body is sculpted at load time from signed-distance anatomy, meshed with surface nets and skinned automatically. Deaths and corpses are simulated with a verlet ragdoll. All sounds, including gunshots, rain and zombie voices, are synthesised with Web Audio. The camera look (fisheye lens, chromatic aberration, auto exposure, sensor noise, compression and lens water) is a custom post-processing chain.</p>
+        <h3>THIRD-PARTY ASSETS</h3>
+        <p>Surface textures, props and HDR environments: Poly Haven (polyhaven.com), CC0. Rendering: three.js (MIT). Type: Big Shoulders Display and IBM Plex (SIL Open Font License).</p>
+        <h3>FICTION</h3>
+        <p>All names, units, places and devices are fictional.</p>
+      </div>
+      <footer><button class="btn primary" data-close type="button">Back</button></footer>
+    </div>
+  </section>
+
+  <section id="pause" class="screen modal" hidden>
+    <div class="panel">
+      <header><h2>Playback paused</h2><span class="eyebrow" id="pauseTime"></span></header>
+      <div class="body" style="padding-top:12px">
+        <button class="btn primary" id="pResume" type="button"><span class="idx">▶</span>Resume</button>
+        <button class="btn" id="pSettings" type="button"><span class="idx">⚙</span>Settings</button>
+        <button class="btn" id="pRestart" type="button"><span class="idx">↺</span>Rewind to last marker</button>
+        <button class="btn" id="pQuit" type="button"><span class="idx">✕</span>Quit to evidence menu</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="over" class="screen modal" hidden>
+    <div class="panel">
+      <header><h2>Recording interrupted</h2><span class="eyebrow" id="overTime"></span></header>
+      <div class="body" style="padding-top:12px">
+        <p class="note" id="overNote" style="padding-bottom:10px">The camera kept recording after the officer went down.</p>
+        <button class="btn primary" id="oRetry" type="button"><span class="idx">↺</span>Rewind to last marker</button>
+        <button class="btn" id="oQuit" type="button"><span class="idx">✕</span>Quit to evidence menu</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="ending" class="screen" hidden>
+    <div class="inner">
+      <span class="eyebrow">Evidence item 14-B · End of recording · 03:38:32</span>
+      <h2>END OF<br>RECORDING</h2>
+      <p id="endText">Officer Ray Halloran, 21-Adam-14, was shot by responding SWAT officers at 03:38 after showing symptoms of what would later be called Keston fever. He was the first law enforcement death of the outbreak. Within seventy-two hours the east district was sealed. This recording was never released.</p>
+      <div class="stats" id="endStats"></div>
+      <button class="btn primary" id="eMenu" type="button"><span class="idx">↩</span>Return to evidence menu</button>
+    </div>
+  </section>
+
+  <div id="rotate"><svg viewBox="0 0 64 64" fill="none" stroke="#e9e6dc" stroke-width="2"><rect x="20" y="8" width="24" height="48" rx="4"/><circle cx="32" cy="50" r="2"/></svg>ROTATE TO LANDSCAPE</div>
+</div>
+<script src="build/game.js"></script>
+</body>
+</html>

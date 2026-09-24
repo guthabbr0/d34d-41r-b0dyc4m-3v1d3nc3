@@ -1,0 +1,17 @@
+{
+  "name": "dead-air",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DEAD AIR - a photoreal bodycam-style zombie shooter for the browser",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "watch": "node tools/build.mjs --watch",
+    "serve": "http-server -p 8080 -c-1 .",
+    "assets": "python3 tools/fetch_assets.py"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "three": "0.186.0"
+  }
+}
