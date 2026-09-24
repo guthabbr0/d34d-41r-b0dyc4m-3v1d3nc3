@@ -1,7 +1,7 @@
 // Zombie actor: perception, flow-field chase, attacks/grabs, hit reactions, gore and ragdoll death.
 import * as THREE from 'three';
 import { Body, BI, makeCharacterMaterial } from './humanoid.js';
-import { Pose, applyPose, poseIdle, poseShamble, poseRun, poseAttack, poseFeed, poseKneelGrab, HitReact } from './anim.js';
+import { Pose, applyPose, poseIdle, poseShamble, poseRun, poseAttack, poseFeed, poseKneelGrab, poseCrawl, HitReact } from './anim.js';
 import { Ragdoll } from './ragdoll.js';
 import { CANE, steadyCane } from './kitbody.js';
 import { SURF } from './world.js';
@@ -277,27 +277,29 @@ export class Zombie {
     this.root.rotation.set(0, this.yaw, 0);
   }
 
-  // Crawler: the kit's crawl and frenzy gaits blended by ground speed and advanced by distance
-  // covered (metres per gait cycle, kitbody.js), the leap during a pounce, kneeling when it latches on.
+  // Crawler: IK crawl on all fours (anim.js poseCrawl), prowling on hands and knees and breaking into a
+  // bear-crawl sprint with speed, advanced by distance covered; the kit's leap during a pounce; kneeling
+  // when it latches on.
   _poseCrawler(p, dt, spd) {
-    const C = this.clips;
     if (this.state === 'feed') { poseFeed(p, this.t); return; }
     if (this.state === 'grab') { poseKneelGrab(p, this.t); return; }
     if (this.state === 'attack') {
+      const C = this.clips;
       C.windowLeap.sample(p, this.attackT);
       // keep the crouch height, scale the arc above it with the leap length
-      const base = C.crawl.root[1];
+      const base = C.windowLeap.root[1];
       p.root.y = base + (p.root.y - base) * this.leapV;
       return;
     }
-    const g = this.arch.gait, k = THREE.MathUtils.smoothstep(spd, 0.8, 2.2);
-    this.gait = (this.gait + dt * spd / (g.crawl + (g.frenzy - g.crawl) * k)) % 1;
-    C.crawl.sample(p, this.gait * C.crawl.duration);
-    if (k > 0) p.blend(C.frenzy.sample(this.auxPose.clear(), this.gait * C.frenzy.duration), k);
-    const still = 1 - Math.min(1, spd / 0.3);
-    p.addB(BI.head, Math.sin(this.t * 0.8) * 0.15 * still, Math.sin(this.t * 0.37 + this.id) * 0.6 * still, Math.sin(this.t * 0.5) * 0.2 * still);
-    p.addB(BI.chest, Math.sin(this.t * 1.9) * 0.05, 0, 0);
-    p.addB(BI.jaw, 0.08 + Math.max(0, Math.sin(this.t * 3.1 + this.id)) * 0.3);
+    const G = this.arch.gait, k = THREE.MathUtils.smoothstep(spd, 1.2, 2.6);
+    const stride = G.prowl + (G.gallop - G.prowl) * k;
+    if (spd > 0.05) this.gait = (this.gait + dt * spd / stride) % 1;
+    const J = this.tpl.J, look = Math.sin(this.t * 0.37 + this.id) * 0.5 * (1 - Math.min(1, spd / 0.3));
+    if (k < 1) poseCrawl(p, J, this.gait, { gallop: 0, stride, t: this.t, look });
+    if (k > 0) {
+      const a = poseCrawl(this.auxPose.clear(), J, this.gait, { gallop: 1, stride, t: this.t, look });
+      if (k < 1) p.blend(a, k); else p.copy(a);
+    }
   }
 
   // Grandmother: the kit's cane walk for spine, arms, head and cane over short shuffling steps matched to

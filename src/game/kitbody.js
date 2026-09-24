@@ -17,8 +17,8 @@ export const ARCHETYPES = {
   businessman: { hp: 90, speed: [0.85, 1.05], reach: [0.4, 0.9], limp: [0, 0.3], lean: 0.3, voice: 1.0, erratic: true },
   businesswoman: { hp: 85, speed: [0.8, 0.95], reach: [0.5, 1.0], limp: [0, 0.2], lean: 0.25, voice: 1.22, stride: 0.24, stalker: true },
   grandmother: { hp: 70, speed: [0.36, 0.42], reach: [0, 0], limp: [0, 0], lean: 0, voice: 1.14, cane: true },
-  // gait: metres covered per cycle of the kit's crawl / frenzy clips (hand stance travel x 2)
-  crawler: { hp: 60, speed: [2.5, 3.1], reach: [0, 0], limp: [0, 0], lean: 0, voice: 1.06, crawler: true, gait: { crawl: 0.36, frenzy: 0.62 } },
+  // gait: metres covered per stride of the IK crawl (anim.js poseCrawl), prowling and galloping
+  crawler: { hp: 60, speed: [2.5, 3.1], reach: [0, 0], limp: [0, 0], lean: 0, voice: 1.06, crawler: true, gait: { prowl: 0.46, gallop: 0.72 } },
 };
 
 const KIT_TO_GAME = {
@@ -354,7 +354,7 @@ const KIT_ALBEDO = /* glsl */`
   float n1 = kfbm(op * 18.0 + uSeed), n2 = kfbm(op * 5.0 + uSeed * 2.0), n3 = kfbm(op * 9.0 - uSeed);
   // ---- dead skin: desaturated toward a grey-green pallor, mottled, bruised, veined
   float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  vec3 dead = mix(vec3(lum), col, 0.38) * uSkinTint * (0.8 + 0.34 * n1);
+  vec3 dead = mix(vec3(lum), col, 0.38) * uSkinTint * (0.62 + 0.3 * n1);
   dead = mix(dead, dead * vec3(0.58, 0.46, 0.62), smoothstep(0.55, 0.8, n2) * 0.8);
   float veins = 1.0 - smoothstep(0.0, 0.03, abs(kn(op * 30.0 + uSeed) - 0.5));
   dead = mix(dead, vec3(0.13, 0.15, 0.2) * (lum * 1.6 + 0.05), veins * 0.42 * (1.0 - face * 0.5));
@@ -381,7 +381,10 @@ const KIT_ALBEDO = /* glsl */`
   float hands = smoothstep(0.1, 0.0, min(length(op - uHandL3), length(op - uHandR3)) - 0.03) * smoothstep(0.3, 0.6, n2);
   float dried = clamp((mouth * 1.3 + drip * 0.9 + chest * 0.75 + hands * 0.9) * uDecay, 0.0, 1.0);
   // ---- clothing: palette tint, grime, mud at the hem, collars soaked through
-  col *= mix(vec3(1.0), uClothTint, garment);
+  // the kit's photographic atlas runs 3-4x brighter than the game's fabrics (humanoid.js): bring
+  // garments, gear and shoes into the same range; reflective accents keep their flare
+  col *= mix(vec3(1.0), uClothTint * 0.42, garment);
+  col *= 1.0 - 0.45 * clamp(isReg(rg, 8.0) + isReg(rg, 9.0) + shirt, 0.0, 1.0);
   float grime = kfbm(op * 7.0 + 9.0);
   col *= 1.0 - (garment + shirt) * uDirt * 0.35 * grime;
   col = mix(col, col * vec3(0.55, 0.47, 0.38), (garment + isReg(rg, 9.0)) * smoothstep(0.45, 0.08, op.y) * uDirt * 0.7);

@@ -11,7 +11,17 @@ export class Pose {
   set(b, x, y = 0, z = 0) { const i = b * 3; this.r[i] = x; this.r[i + 1] = y; this.r[i + 2] = z; return this; }
   addB(b, x, y = 0, z = 0, w = 1) { const i = b * 3; this.r[i] += x * w; this.r[i + 1] += y * w; this.r[i + 2] += z * w; }
   blend(o, w) {
-    for (let i = 0; i < this.r.length; i++) this.r[i] += (o.r[i] - this.r[i]) * w;
+    const r = this.r, q = o.r;
+    for (let i = 0; i < r.length; i += 3) {
+      // near the ZXY singularity (swing ~90 degrees, e.g. the crawler's IK arms) the same rotation can
+      // flip to a different euler triple between frames; blend those through quaternions instead
+      if (Math.abs(q[i + 1] - r[i + 1]) > 1.6 || Math.abs(q[i + 2] - r[i + 2]) > 1.6) {
+        _ba.setFromEuler(_be.set(r[i], r[i + 1], r[i + 2], 'ZXY'));
+        _bb.setFromEuler(_be.set(q[i], q[i + 1], q[i + 2], 'ZXY'));
+        _be.setFromQuaternion(_ba.slerp(_bb, w), 'ZXY');
+        r[i] = _be.x; r[i + 1] = _be.y; r[i + 2] = _be.z;
+      } else for (let k = i; k < i + 3; k++) r[k] += (q[k] - r[k]) * w;
+    }
     this.root.lerp(o.root, w); this.rootRotY += (o.rootRotY - this.rootRotY) * w;
     return this;
   }
@@ -19,6 +29,7 @@ export class Pose {
 }
 
 const _e = new THREE.Euler(0, 0, 0, 'ZXY');
+const _be = new THREE.Euler(0, 0, 0, 'ZXY'), _ba = new THREE.Quaternion(), _bb = new THREE.Quaternion();
 export function applyPose(body, pose) {
   const bones = body.bones;
   for (let b = 0; b < NB; b++) {
@@ -151,6 +162,104 @@ export function poseFeed(p, t, o = {}) {
     p.set(BI[P + 'upper'], -0.95 + tug * 0.4 * (s > 0 ? 1 : 0.6), 0.2 * s, -0.15 * s);
     p.set(BI[P + 'fore'], -0.7 - tug * 0.3, 0, 0);
     p.set(BI[P + 'hand'], -0.4, 0, 0);
+  }
+  return p;
+}
+
+// ------------------------------------------------------------------ crawler gait
+// On all fours with analytic IK so palms and knees meet the floor for any limb proportions (J = the
+// template's bind joints). The torso is posed by FK; each limb then aims at a contact point that stays
+// planted while the body passes over it (stance) and swings forward, lifted, to the next one.
+// gallop 0 = prowl on hands and knees, 1 = bear-crawl sprint with the knees off the floor.
+// phase in cycles (one cycle = one stride of every limb, `stride` metres of travel).
+const _cq = [], _cp = [];
+for (let i = 0; i < 24; i++) { _cq.push(new THREE.Quaternion()); _cp.push(new THREE.Vector3()); }
+const _ce = new THREE.Euler(0, 0, 0, 'ZXY'), _cv = new THREE.Vector3(), _cw = new THREE.Vector3(), _cu = new THREE.Vector3();
+const _cqa = new THREE.Quaternion(), _cqb = new THREE.Quaternion();
+const jv = (J, n, out) => out.set(J[n][0], J[n][1], J[n][2]);
+const qOf = (p, b, out) => out.setFromEuler(_ce.set(p.r[b * 3], p.r[b * 3 + 1], p.r[b * 3 + 2], 'ZXY'));
+function setLocal(p, b, qParentWorld, qWorld) {
+  _cqa.copy(qParentWorld).invert().multiply(qWorld);
+  _ce.setFromQuaternion(_cqa, 'ZXY');
+  p.set(b, _ce.x, _ce.y, _ce.z);
+}
+// world rotation that takes the bind direction a->b (J) onto dir, composed after qParentWorld's frame
+function aimWorld(J, a, b, qParentWorld, dir, out) {
+  const bind = jv(J, b, _cu).sub(jv(J, a, _cw)).normalize().applyQuaternion(qParentWorld);
+  return out.setFromUnitVectors(bind, _cv.copy(dir).normalize()).multiply(qParentWorld);
+}
+// two-bone IK: elbow/knee position for a chain root -> target with lengths l1, l2, bending toward pole
+function solveTwo(root, target, l1, l2, pole, outMid) {
+  const d = _cv.subVectors(target, root);
+  const len = Math.min(d.length(), (l1 + l2) * 0.999);
+  d.normalize();
+  const a = (l1 * l1 - l2 * l2 + len * len) / (2 * len);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const side = _cw.copy(pole).addScaledVector(d, -pole.dot(d)).normalize();
+  return outMid.copy(root).addScaledVector(d, a).addScaledVector(side, h);
+}
+
+export function poseCrawl(p, J, phase, o = {}) {
+  const g = o.gallop ?? 0, stride = o.stride ?? 0.5, t = o.t ?? 0;
+  const tau = Math.PI * 2, ph = phase * tau;
+  // torso: pitched forward, rising at the shoulders; hips roll and yaw with the diagonal gait
+  const pitch = 1.22 + g * 0.16;
+  const bob = Math.abs(Math.sin(ph)) * (0.015 + g * 0.05);
+  p.root.set(Math.sin(ph) * 0.02, (0.49 + g * 0.05) - J.hips[1] + bob, -0.12);
+  p.set(BI.hips, pitch, Math.sin(ph) * 0.12, Math.sin(ph) * 0.05);
+  p.set(BI.spine, 0.05 + Math.sin(ph * 2) * 0.05 * g, -Math.sin(ph) * 0.1, 0);
+  p.set(BI.chest, 0.04, -Math.sin(ph) * 0.12, Math.sin(ph) * 0.04);
+  p.set(BI.neck, -0.5 - g * 0.1, o.look ?? 0, 0);
+  p.set(BI.head, -0.55 + Math.sin(t * 1.3) * 0.06, Math.sin(t * 0.7) * 0.15, Math.sin(t * 0.9) * 0.1);
+  p.set(BI.jaw, 0.1 + Math.max(0, Math.sin(t * 3.1)) * 0.3 + g * 0.2);
+  // FK of the torso chain in actor space
+  const qH = qOf(p, BI.hips, _cq[0]);
+  const pH = jv(J, 'hips', _cp[0]).add(p.root);
+  const qS = _cq[1].copy(qH).multiply(qOf(p, BI.spine, _cqb));
+  const pS = _cp[1].copy(jv(J, 'spine', _cu).sub(jv(J, 'hips', _cw)).applyQuaternion(qH)).add(pH);
+  const qC = _cq[2].copy(qS).multiply(qOf(p, BI.chest, _cqb));
+  const pC = _cp[2].copy(jv(J, 'chest', _cu).sub(jv(J, 'spine', _cw)).applyQuaternion(qS)).add(pS);
+  const lift = 0.1 + g * 0.08;
+  for (const [s, P] of SIDES) {
+    // diagonal pairs: left hand with right knee
+    const armPh = (phase + (s > 0 ? 0 : 0.5)) % 1, legPh = (armPh + 0.5) % 1;
+    const stance = (u) => u < 0.5;
+    const along = (u) => stance(u) ? 0.5 - u * 2 : -0.5 + (u - 0.5) * 2;     // +0.5 front .. -0.5 back
+    const up = (u) => stance(u) ? 0 : Math.sin((u - 0.5) * 2 * Math.PI);
+    // arm: clavicle stays, the hand plants ahead of and just inside the shoulder
+    p.set(BI[P + 'clav'], 0, 0, 0);
+    const pClav = _cp[3].copy(jv(J, P + 'clav', _cu).sub(jv(J, 'chest', _cw)).applyQuaternion(qC)).add(pC);
+    const pSh = _cp[4].copy(jv(J, P + 'upper', _cu).sub(jv(J, P + 'clav', _cw)).applyQuaternion(qC)).add(pClav);
+    const reachZ = 0.16 - g * 0.04;
+    const hand = _cp[5].set(pSh.x * 0.8 + s * 0.02, 0.07 + up(armPh) * lift, pSh.z + reachZ + along(armPh) * stride);
+    const l1 = jv(J, P + 'fore', _cu).distanceTo(jv(J, P + 'upper', _cw)), l2 = jv(J, P + 'hand', _cu).distanceTo(jv(J, P + 'fore', _cw));
+    const elbow = solveTwo(pSh, hand, l1, l2, _cp[6].set(s * 0.6, 0.2, -1), _cp[7]);
+    const qU = aimWorld(J, P + 'upper', P + 'fore', qC, _cp[8].subVectors(elbow, pSh), _cq[3]);
+    setLocal(p, BI[P + 'upper'], qC, qU);
+    const qF = aimWorld(J, P + 'fore', P + 'hand', qU, _cp[8].subVectors(hand, elbow), _cq[4]);
+    setLocal(p, BI[P + 'fore'], qU, qF);
+    // claws: fingers forward along the floor, curling off it while the hand swings
+    const qW = aimWorld(J, P + 'hand', P + 'tip', qF, _cp[8].set(s * 0.15, -0.45 - up(armPh) * 0.6, 1), _cq[5]);
+    setLocal(p, BI[P + 'hand'], qF, qW);
+    // leg: the knee plants under and just outside the hip (prowl) or lifts into a crouch (gallop)
+    const pHip = _cp[9].copy(jv(J, P + 'thigh', _cu).sub(jv(J, 'hips', _cw)).applyQuaternion(qH)).add(pH);
+    const lt = jv(J, P + 'shin', _cu).distanceTo(jv(J, P + 'thigh', _cw)), ls = jv(J, P + 'foot', _cu).distanceTo(jv(J, P + 'shin', _cw));
+    const legStride = stride * 0.9;
+    let knee, foot;
+    if (g < 0.5) {
+      knee = _cp[10].set(pHip.x + s * 0.05, 0.07 + up(legPh) * lift * 0.7, pHip.z + 0.06 + along(legPh) * legStride);
+      foot = _cp[11].set(knee.x + s * 0.02, 0.1 + up(legPh) * 0.05, knee.z - ls * 0.97);
+    } else {
+      // bear crawl: the foot plants and the knee rises between hip and foot
+      foot = _cp[11].set(pHip.x + s * 0.04, 0.08 + up(legPh) * lift, pHip.z - 0.05 + along(legPh) * legStride);
+      knee = solveTwo(pHip, foot, lt, ls, _cp[12].set(s * 0.3, 0.2, 1), _cp[10]);
+    }
+    const qT = aimWorld(J, P + 'thigh', P + 'shin', qH, _cp[8].subVectors(knee, pHip), _cq[6]);
+    setLocal(p, BI[P + 'thigh'], qH, qT);
+    const qK = aimWorld(J, P + 'shin', P + 'foot', qT, _cp[8].subVectors(foot, knee), _cq[7]);
+    setLocal(p, BI[P + 'shin'], qT, qK);
+    const qFt = aimWorld(J, P + 'foot', P + 'toe', qK, _cp[8].set(0, g < 0.5 ? -0.6 : -0.2, g < 0.5 ? -1 : 1), _cq[8]);
+    setLocal(p, BI[P + 'foot'], qK, qFt);
   }
   return p;
 }

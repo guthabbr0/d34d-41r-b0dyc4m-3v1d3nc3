@@ -81,7 +81,7 @@ export class Game {
       ['worker', {}],
       ['businessman', {}],
       ['grandmother', {}],
-      ['crawler', {}],
+      ['crawler', { style: { clothTint: 0x8a8070, dirt: 0.95, skinTint: [0x9ea08c, 0xa49c8c] } }],
       ['businesswoman', {}],
       ['businessman', { style: { clothTint: 0xa89480 } }],   // brown suit: the man in 1C
       ['tactical', {}],
