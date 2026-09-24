@@ -59,6 +59,26 @@ export class Player {
     this.breath = 0;
   }
 
+  // After a scripted camera hands control back, the player's feet can end up overlapping furniture.
+  // Push out of solids; if the spot is still not walkable, walk the nav grid to the nearest free cell.
+  unstick() {
+    const g = this.game, w = g.world, nav = g.nav;
+    for (let i = 0; i < 4; i++) w.collideCircle(this.pos, this.radius);
+    const ci = nav.idx(this.pos.x, this.pos.z);
+    if (ci < 0 || !nav.blocked[ci]) return;
+    const seen = new Set([ci]), q = [ci];
+    for (let h = 0; h < q.length && h < 4000; h++) {
+      const c = q[h], cx = c % nav.w, cz = (c / nav.w) | 0;
+      if (!nav.blocked[c]) { this.pos.x = nav.minx + (cx + 0.5) * nav.cell; this.pos.z = nav.minz + (cz + 0.5) * nav.cell; w.collideCircle(this.pos, this.radius); return; }
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx, nz = cz + dz;
+        if (nx < 0 || nz < 0 || nx >= nav.w || nz >= nav.h) continue;
+        const n = nz * nav.w + nx;
+        if (!seen.has(n)) { seen.add(n); q.push(n); }
+      }
+    }
+  }
+
   reset(p, yaw) {
     this.pos.copy(p); this.vel.set(0, 0, 0); this.yaw = yaw; this.pitch = 0;
     this.health = this.maxHealth; this.alive = true; this.stamina = 1;

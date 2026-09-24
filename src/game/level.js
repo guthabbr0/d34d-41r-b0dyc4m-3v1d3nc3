@@ -368,17 +368,20 @@ export function buildLevel({ assets, M, world, scene, quality }) {
   place('sofa_03', 0.6, -14.9, 0, { surf: SURF.FABRIC });
   place('modern_arm_chair_01', -1.8, -13.0, Math.PI / 2 + 0.3, { surf: SURF.FABRIC });
   place('side_table_01', 0.9, -13.2, 0.1, {});
-  const tv = place('Television_01', 1.2, -11.1, Math.PI, { y: 0.55, surf: SURF.GLASS, s: 1.1 });
-  place('side_table_01', 1.2, -11.1, Math.PI, { s: 1.0 });
+  // TV set against the north wall, west of the entry door (it used to sit in the doorway lane,
+  // leaving a 0.29 m gap that trapped the player inside 1C after the bite cutscene)
+  const TVX = -0.8;
+  const tv = place('Television_01', TVX, -11.1, Math.PI, { y: 0.55, surf: SURF.GLASS, s: 1.1 });
+  place('side_table_01', TVX, -11.1, Math.PI, { s: 1.0 });
   // TV static screen
   const tvMat = new THREE.MeshStandardMaterial({ color: 0, emissive: 0xffffff, emissiveIntensity: 2.5 });
   const tvTex = makeStaticTexture();
   tvMat.emissiveMap = tvTex;
   const tvScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.3), tvMat);
-  tvScreen.position.set(1.2 + 0.0, 0.55 + 0.26, -11.1 - 0.235); tvScreen.rotation.y = Math.PI;
+  tvScreen.position.set(TVX, 0.55 + 0.26, -11.1 - 0.235); tvScreen.rotation.y = Math.PI;
   root.add(tvScreen);
   L.animated.push((dt, t) => { if ((t * 20 | 0) !== tvTex.userData.f) { tvTex.userData.f = t * 20 | 0; tvTex.userData.draw(); } });
-  lights.add({ name: 'tv', pos: V3(1.2, 0.9, -11.6), color: 0xa8c4ff, intensity: 14, distance: 7, zone: '1C', pattern: 'tv', emissive: tvMat, emissiveBase: 2.5, priority: 2 });
+  lights.add({ name: 'tv', pos: V3(TVX, 0.9, -11.6), color: 0xa8c4ff, intensity: 14, distance: 7, zone: '1C', pattern: 'tv', emissive: tvMat, emissiveBase: 2.5, priority: 2 });
   const lamp = P.buildFloorLamp(m);
   lamp.position.set(-1.6, 0.14, -14.6); lamp.rotation.set(0, 0.4, Math.PI / 2 - 0.1); root.add(lamp);
   lights.add({ name: 'floorlamp', pos: V3(-1.1, 0.3, -14.4), color: 0xffb870, intensity: 18, distance: 6, zone: '1C', pattern: 'buzz' });

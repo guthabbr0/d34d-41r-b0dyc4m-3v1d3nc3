@@ -506,6 +506,7 @@ export class Story {
     this.camFollow = null;
     // struggle (interactive) - the bite always lands
     this.cutscene = false; p.scripted = null;
+    p.unstick();
     this.cam.aimQuat = null;
     p.controls = true;
     g.noGrab = false;
@@ -908,6 +909,7 @@ export class Story {
   endCutscene() {
     const g = this.game;
     this.cutscene = false; this.canSkip = false; this.skipping = false;
+    if (g.player.scripted && !this.cam.parent) g.player.unstick();
     g.player.scripted = null;
     g.weapons.customArms = null; g.weapons.forceLower = false; g.weapons.setVisible(true);
     g.noGrab = false;
