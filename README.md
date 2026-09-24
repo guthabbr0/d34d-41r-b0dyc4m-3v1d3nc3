@@ -43,6 +43,10 @@ npm run serve        # http://localhost:8080
 `npm run watch` rebuilds on change; during development you can also serve the repository root
 (`python3 -m http.server 8080`), since `index.html` loads `build/game.js` directly.
 
+Icons: `favicon.svg` is the source (it hides its fine detail when drawn at tab size, via a media
+query inside the SVG); `npm run icons` re-renders `favicon.ico` (16/32/48 px) and
+`apple-touch-icon.png` (180 px) from it.
+
 Debug URL parameters: `?q=low|medium|high|ultra` forces a preset, `?start=intro|cp0|cp1|cp2` jumps
 to a checkpoint, `?auto=1` skips the click-to-start gate.
 
@@ -56,7 +60,7 @@ The repository is set up for Vercel's Git integration; pushing is all it takes.
 | framework | none (static site) |
 | install | `npm ci` (Node 22.x from `package.json` `engines`) |
 | build | `npm run build` |
-| output | `dist/web` — `index.html`, the content-hashed bundle, `assets/` (about 13 MB) |
+| output | `dist/web` — `index.html`, the content-hashed bundle, icons, `assets/` (about 13 MB) |
 | caching | bundle `immutable` for a year (its name changes with its content), assets a week with background revalidation, `index.html` revalidated on every visit |
 
 Any static host works the same way: run `npm run build` and publish `dist/web`.

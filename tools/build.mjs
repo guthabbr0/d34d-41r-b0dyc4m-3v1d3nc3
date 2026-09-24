@@ -29,7 +29,8 @@ function emitArtifact() {
   // The artifact host supplies <!doctype>, <html>, <head> and <body>; keep only their content.
   const head = html.match(/<head>([\s\S]*?)<\/head>/i)[1]
     .replace(/<meta charset[^>]*>\s*/i, '')
-    .replace(/<meta name="viewport"[^>]*>\s*/i, '');
+    .replace(/<meta name="viewport"[^>]*>\s*/i, '')
+    .replace(/<link rel="(icon|apple-touch-icon)"[^>]*>\s*/gi, '');   // the artifact host supplies its own icon
   const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)[1];
   fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
   fs.writeFileSync(path.join(root, 'dist/artifact.html'), head.trim() + '\n' + body.trim() + '\n');
@@ -49,6 +50,8 @@ function emitSite() {
   if (!html.includes('src="build/game.js"')) throw new Error('index.html no longer loads build/game.js');
   fs.writeFileSync(path.join(out, 'index.html'), html.replace('src="build/game.js"', `src="${bundle}"`));
   for (const dir of ['tex', 'models', 'hdri']) fs.cpSync(path.join(root, 'assets', dir), path.join(out, 'assets', dir), { recursive: true });
+  // icons (regenerate the raster ones with tools/make_favicon.mjs after editing favicon.svg)
+  for (const f of ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png']) fs.copyFileSync(path.join(root, f), path.join(out, f));
   let files = 0, bytes = 0;
   const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else { files++; bytes += fs.statSync(f).size; } } };
   walk(out);

@@ -9,6 +9,7 @@
     "watch": "node tools/build.mjs --watch",
     "serve": "npx --yes http-server dist/web -p 8080 -c-1",
     "assets": "python3 tools/fetch_assets.py",
+    "icons": "node tools/make_favicon.mjs",
     "perf:gate": "node perf/gate.mjs perf/run-3/report.json --phases heavy",
     "perf:pvs": "node perf/pvs_check.mjs",
     "preview": "npm run build && npm run serve"

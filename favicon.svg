@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Dead Air</title>
+  <defs>
+    <radialGradient id="tile" cx="45%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#1a1f27"/>
+      <stop offset="1" stop-color="#07090c"/>
+    </radialGradient>
+    <radialGradient id="glass" cx="38%" cy="34%" r="70%">
+      <stop offset="0" stop-color="#2c4652"/>
+      <stop offset="0.45" stop-color="#0d161c"/>
+      <stop offset="1" stop-color="#020304"/>
+    </radialGradient>
+    <radialGradient id="rec" cx="40%" cy="35%" r="65%">
+      <stop offset="0" stop-color="#ff7a63"/>
+      <stop offset="1" stop-color="#e2402f"/>
+    </radialGradient>
+  </defs>
+  <!-- adaptive detail: in an SVG used as an image, media queries test the size it is drawn at,
+       so tab-sized renders drop the brackets, crack and blood and keep a crisp lens + REC dot -->
+  <style>@media (max-width: 40px) { .detail { display: none } }</style>
+  <!-- camera body tile -->
+  <rect class="tile" width="64" height="64" rx="14" fill="url(#tile)"/>
+  <!-- viewfinder corner brackets -->
+  <g class="detail" fill="none" stroke="#e9e6dc" stroke-opacity="0.55" stroke-width="2.4" stroke-linecap="round">
+    <path d="M9 19V9h10M45 55h10V45M9 45v10h10"/>
+  </g>
+  <!-- fisheye lens: lateral chromatic aberration fringes, then the barrel -->
+  <circle cx="30.4" cy="34" r="17.5" fill="none" stroke="#39d0ff" stroke-width="5" stroke-opacity="0.9"/>
+  <circle cx="33.6" cy="34" r="17.5" fill="none" stroke="#ff3b2f" stroke-width="5" stroke-opacity="0.9"/>
+  <circle cx="32" cy="34" r="17.5" fill="url(#glass)" stroke="#e9e6dc" stroke-width="4.2"/>
+  <!-- inner element ring and glints -->
+  <circle cx="32" cy="34" r="9.5" fill="none" stroke="#6f8c99" stroke-opacity="0.45" stroke-width="1.6"/>
+  <ellipse cx="25.5" cy="27.5" rx="5.2" ry="3.2" transform="rotate(-38 25.5 27.5)" fill="#ffffff" fill-opacity="0.85"/>
+  <circle class="detail" cx="38.5" cy="40.5" r="1.6" fill="#ffffff" fill-opacity="0.5"/>
+  <!-- evidence damage: a cracked lens element and blood smeared across the barrel -->
+  <g class="detail" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M44.2 24.6l-6.1 5.2 2.3 3.6-5.6 4.3M38.1 29.8l-4.4-1.9M40.4 33.4l4.9 2.6" stroke="#ffffff" stroke-opacity="0.75" stroke-width="1.1"/>
+    <path d="M17.4 42.6a17.5 17.5 0 0 0 9.8 8.6" stroke="#8a1a14" stroke-width="4.6"/>
+    <circle cx="21.6" cy="52.4" r="1.7" fill="#8a1a14" stroke="none"/>
+    <path d="M24.4 51.2q.6 3.4-.2 5.6" stroke="#8a1a14" stroke-width="1.8"/>
+  </g>
+  <!-- REC -->
+  <circle cx="51" cy="13" r="7.5" fill="#07090c"/>
+  <circle cx="51" cy="13" r="5.6" fill="url(#rec)"/>
+</svg>
