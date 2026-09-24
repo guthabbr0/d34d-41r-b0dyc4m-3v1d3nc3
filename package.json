@@ -7,13 +7,17 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "watch": "node tools/build.mjs --watch",
-    "serve": "http-server -p 8080 -c-1 .",
+    "serve": "npx --yes http-server dist/web -p 8080 -c-1",
     "assets": "python3 tools/fetch_assets.py",
     "perf:gate": "node perf/gate.mjs perf/run-3/report.json --phases heavy",
-    "perf:pvs": "node perf/pvs_check.mjs"
+    "perf:pvs": "node perf/pvs_check.mjs",
+    "preview": "npm run build && npm run serve"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
     "three": "0.186.0"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }

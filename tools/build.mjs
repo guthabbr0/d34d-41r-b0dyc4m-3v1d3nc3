@@ -1,6 +1,9 @@
-// Bundles src/ into build/game.js (single IIFE, three.js included) and emits an
-// artifact-ready page (dist/artifact.html) whose outer document tags are stripped.
+// Bundles src/ into build/game.js (single IIFE, three.js included), then emits
+//  - dist/web/        the deployable static site (Vercel output directory, see vercel.json):
+//                     index.html + content-hashed bundle + assets/, nothing else from the repo
+//  - dist/artifact.html  an artifact-ready page whose outer document tags are stripped
 import * as esbuild from 'esbuild';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -32,10 +35,31 @@ function emitArtifact() {
   fs.writeFileSync(path.join(root, 'dist/artifact.html'), head.trim() + '\n' + body.trim() + '\n');
 }
 
+// Static site: the bundle gets a content hash so it can be cached forever; index.html is rewritten
+// to point at it and is the only file that must be revalidated on every visit.
+function emitSite() {
+  const out = path.join(root, 'dist/web');
+  fs.rmSync(out, { recursive: true, force: true });
+  fs.mkdirSync(path.join(out, 'build'), { recursive: true });
+  const js = fs.readFileSync(path.join(root, 'build/game.js'));
+  const hash = crypto.createHash('sha256').update(js).digest('hex').slice(0, 10);
+  const bundle = `build/game.${hash}.js`;
+  fs.writeFileSync(path.join(out, bundle), js);
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  if (!html.includes('src="build/game.js"')) throw new Error('index.html no longer loads build/game.js');
+  fs.writeFileSync(path.join(out, 'index.html'), html.replace('src="build/game.js"', `src="${bundle}"`));
+  for (const dir of ['tex', 'models', 'hdri']) fs.cpSync(path.join(root, 'assets', dir), path.join(out, 'assets', dir), { recursive: true });
+  let files = 0, bytes = 0;
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else { files++; bytes += fs.statSync(f).size; } } };
+  walk(out);
+  console.log(`site: dist/web (${files} files, ${(bytes / 1048576).toFixed(1)} MB, bundle ${bundle})`);
+}
+
 if (watch) {
   const ctx = await esbuild.context(opts);
   await ctx.watch();
 } else {
   await esbuild.build(opts);
   emitArtifact();
+  emitSite();
 }

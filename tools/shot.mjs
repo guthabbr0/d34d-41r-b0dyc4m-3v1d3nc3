@@ -1,24 +1,25 @@
 // Headless test harness: serves the repo, opens the game in Chromium (SwiftShader WebGL),
 // runs an optional scripted sequence and saves screenshots.
 //   node tools/shot.mjs --url "index.html?debug=1" --out shot.png [--w 1280 --h 720] [--wait 8000]
-//        [--mobile] [--eval "js"] [--steps steps.json]
+//        [--mobile] [--eval "js"] [--steps steps.json] [--root dist/web]
 import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = path.dirname(path.dirname(new URL(import.meta.url).pathname));
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, arr) => {
   if (a.startsWith('--')) acc.push([a.slice(2), arr[i + 1] && !arr[i + 1].startsWith('--') ? arr[i + 1] : true]);
   return acc;
 }, []));
+// --root dist/web serves the built site instead of the repository
+const root = args.root ? path.resolve(args.root) : path.dirname(path.dirname(new URL(import.meta.url).pathname));
 
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary', '.hdr': 'application/octet-stream', '.css': 'text/css', '.json': 'application/json' };
 const server = http.createServer((req, res) => {
   const p = decodeURIComponent(req.url.split('?')[0]);
   const f = path.join(root, p === '/' ? 'index.html' : p);
   fs.readFile(f, (err, data) => {
-    if (err) { res.writeHead(404); res.end('nf'); return; }
+    if (err) { if (!args.quiet404) console.log('[server 404] ' + p); res.writeHead(404); res.end('nf'); return; }
     res.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream' });
     res.end(data);
   });
@@ -40,6 +41,7 @@ const ctx = await browser.newContext({
 const page = await ctx.newPage();
 const logs = [];
 page.on('console', m => { const t = `[${m.type()}] ${m.text()}`; logs.push(t); if (!args.quiet || m.type() === 'error') console.log(t); });
+page.on('response', r => { if (r.status() >= 400) console.log('[http ' + r.status() + '] ' + r.url()); });
 page.on('pageerror', e => { console.log('[pageerror]', e.message, e.stack?.split('\n').slice(0, 4).join(' | ')); });
 const url = `http://127.0.0.1:${port}/${args.url || 'index.html'}`;
 await page.goto(url);
