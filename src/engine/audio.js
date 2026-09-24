@@ -497,7 +497,7 @@ export class AudioEngine {
     const now = this.ctx.currentTime;
     if (z._voiceUntil && now < z._voiceUntil && kind !== 'death') return;
     const name = kind === 'attack' ? 'zattack' : kind === 'alert' ? 'zscream' : kind === 'death' ? 'zdeath' : kind === 'feed' ? 'feed' : 'zmoan';
-    const src = this.play(name, { pos: { x: z.pos.x, y: 1.6, z: z.pos.z }, vol: kind === 'alert' ? 1.2 : kind === 'feed' ? 0.8 : 0.9, rate: 0.9 + (z.id % 5) * 0.05, occluded: !z.game.world.lineOfSight(z.game.player.camPos, { x: z.pos.x, y: 1.6, z: z.pos.z, clone() { return this; } }) });
+    const src = this.play(name, { pos: { x: z.pos.x, y: 1.6, z: z.pos.z }, vol: kind === 'alert' ? 1.2 : kind === 'feed' ? 0.8 : 0.9, rate: (0.9 + (z.id % 5) * 0.05) * (z.voicePitch || 1), occluded: !z.game.world.lineOfSight(z.game.player.camPos, { x: z.pos.x, y: 1.6, z: z.pos.z, clone() { return this; } }) });
     if (src) { z._voiceUntil = now + src.buffer.duration / src.playbackRate.value; z._voiceSrc = src; }
   }
 

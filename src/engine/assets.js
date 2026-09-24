@@ -30,6 +30,10 @@ export class Assets {
     this.lowTex = false;
     this.texCap = 1024;     // max texture side (px) for normal/ORM maps and model textures; albedo gets 2x
     this.base = 'assets/';
+    // Ashworth enemy kit (game/kitbody.js decodes it): raw geometry buffers, clips and atlases.
+    this.enemyKit = true;              // false = procedural SDF bodies only
+    this.enemyLods = ['medium', 'far'];  // near and distance meshes (tools/import_enemy_kit.mjs)
+    this.enemies = null;               // { manifest, sets: { id: { geo: { lod: ArrayBuffer }, anim, tex: { d, nr } } } }
   }
 
   async loadAll(onProgress) {
@@ -39,7 +43,7 @@ export class Assets {
     const hdrLoader = new HDRLoader(manager);
     const jobs = [];
     let done = 0;
-    const total = TEXTURE_SETS.length * 3 + MODELS.length + HDRIS.length;
+    const total = TEXTURE_SETS.length * 3 + MODELS.length + HDRIS.length + (this.enemyKit ? 6 : 0);
     const tick = (label) => { done++; onProgress && onProgress(done / total, label); };
 
     // texture budget per preset (perf/README.md): resident GPU memory is dominated by texture sides
@@ -54,6 +58,7 @@ export class Assets {
       }, undefined, () => { console.warn('texture failed', url); res(null); });
     });
 
+    if (this.enemyKit) jobs.push(this.loadEnemies(texLoader, cap, tick).catch((e) => { console.warn('enemy kit failed, using procedural bodies', e); this.enemies = null; }));
     for (const id of TEXTURE_SETS) {
       const set = {};
       this.tex[id] = set;
@@ -101,6 +106,33 @@ export class Assets {
     }
     await Promise.all(jobs);
     pmrem.dispose();
+  }
+
+  // Enemy kit: atlases follow the preset budget (perf/README.md). Albedo gets the texture cap (256 on
+  // LOW, 512 on MEDIUM); the packed normal + roughness map only loads from HIGH up.
+  async loadEnemies(texLoader, cap, tick) {
+    const base = `${this.base}enemies/`;
+    const get = async (f, type) => { const r = await fetch(base + f); if (!r.ok) throw new Error(`${f}: HTTP ${r.status}`); return r[type](); };
+    const manifest = await get('manifest.json', 'json');
+    const tex = (f, srgb, max) => new Promise((res, rej) => texLoader.load(base + f, (t) => {
+      t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      t.flipY = false;                   // kit atlases use top-left UVs
+      t.anisotropy = this.anisotropy;
+      downscaleTexture(t, max);
+      res(t);
+    }, undefined, () => rej(new Error('texture ' + f))));
+    const sets = {};
+    await Promise.all(manifest.enemies.map(async (e) => {
+      const set = sets[e.id] = { geo: {}, anim: null, tex: {} };
+      await Promise.all([
+        ...this.enemyLods.map(l => get(e.lods[l].file, 'arrayBuffer').then(b => { set.geo[l] = b; })),
+        e.anim ? get(e.anim.file, 'arrayBuffer').then(b => { set.anim = b; }) : null,
+        tex(e.textures.d, true, cap).then(t => { set.tex.d = t; }),
+        cap >= 1024 ? tex(e.textures.nr, false, cap).then(t => { set.tex.nr = t; }) : null,
+      ]);
+      tick('subject ' + e.label);
+    }));
+    this.enemies = { manifest, sets };
   }
 
   // Clone a model template; optionally scale to a target height (m) and set shadow flags.

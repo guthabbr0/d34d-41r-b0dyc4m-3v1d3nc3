@@ -11,6 +11,7 @@ import { weaponMaterials } from './weaponModels.js';
 import { FX } from './fx.js';
 import { BodyTemplate, zombieVariant, officerVariant, Body, makeCharacterMaterial } from './humanoid.js';
 import { Zombie } from './zombie.js';
+import { KitTemplate, kitFromAssets } from './kitbody.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3();
 
@@ -59,7 +60,41 @@ export class Game {
     this.weapons = new WeaponSystem(this);
     progress && progress(0.2, 'Calibrating optics');
     await tick();
-    // character templates (SDF sculpting is the expensive part)
+    const kit = kitFromAssets(this.assets);
+    if (kit) this.buildKitTemplates(kit);
+    else await this.buildSdfTemplates(progress);
+    progress && progress(0.82, 'Reconstructing subjects complete');
+    await tick();
+    // footsteps
+    this.player.onStep = (k) => this.audio && this.audio.footstep(this.surfaceUnder(this.player.pos), k, this.player.outdoor);
+    // lights used only by cutscenes exist from the start so shaders never recompile mid-game
+    this.swatLights = [0, 1].map(() => { const l = new THREE.SpotLight(0xf4f8ff, 0, 40, 0.35, 0.5, 1.6); l.castShadow = false; this.scene.add(l, l.target); return l; });
+    this.floodLight = new THREE.PointLight(0xdfe8ff, 0, 40, 2); this.scene.add(this.floodLight);
+    this.setupPickups();
+  }
+
+  // Ashworth enemy kit (docs/enemies/README.md). Slots follow story.js `variant` numbers: the lot
+  // feeder, the office, apartment 1B, the west corridor, the laundry, the attacker in 1C; the tactical
+  // officer only joins the courtyard waves, which cycle through every slot.
+  buildKitTemplates(kit) {
+    const cast = [
+      ['worker', {}],
+      ['businessman', {}],
+      ['grandmother', {}],
+      ['crawler', {}],
+      ['businesswoman', {}],
+      ['businessman', { style: { clothTint: 0xa89480 } }],   // brown suit: the man in 1C
+      ['tactical', {}],
+    ];
+    for (const [id, o] of cast) this.templates.push(new KitTemplate(kit, id, o));
+    // the superintendent: the worker without the hardhat, freshly dead, navy work clothes
+    this.victimTemplate = new KitTemplate(kit, 'worker', { drop: ['Gear / hardhat', 'Gear / helmet rim'], style: { decay: 0.3, clothTint: 0x8c9cb4, skinTint: 0xd8cbbd } });
+    // Keston SWAT: the tactical kit, alive and in black
+    this.swatTemplate = new KitTemplate(kit, 'tactical', { curl: 0.9, style: { decay: 0, dirt: 0.15, clothTint: 0x4a4e58, skinTint: 0xffffff } });
+  }
+
+  // Procedural SDF bodies (humanoid.js): the fallback when the enemy kit is unavailable or disabled.
+  async buildSdfTemplates(progress) {
     const detail = this.settings.get('bodyDetail');
     const N = detail === 0 ? 4 : 6;
     for (let i = 0; i < N; i++) {
@@ -73,14 +108,6 @@ export class Game {
     const victim = zombieVariant(7);
     victim.zombie = 0.2; victim.top = 'tee'; victim.mat.decay = 0.3; victim.mat.skin = 0xa89484; victim.tears = null; victim.hair = 'short';
     this.victimTemplate = new BodyTemplate(this.assets, victim, detail);
-    progress && progress(0.82, 'Reconstructing subjects complete');
-    await tick();
-    // footsteps
-    this.player.onStep = (k) => this.audio && this.audio.footstep(this.surfaceUnder(this.player.pos), k, this.player.outdoor);
-    // lights used only by cutscenes exist from the start so shaders never recompile mid-game
-    this.swatLights = [0, 1].map(() => { const l = new THREE.SpotLight(0xf4f8ff, 0, 40, 0.35, 0.5, 1.6); l.castShadow = false; this.scene.add(l, l.target); return l; });
-    this.floodLight = new THREE.PointLight(0xdfe8ff, 0, 40, 2); this.scene.add(this.floodLight);
-    this.setupPickups();
   }
 
   addArmBlood() {
@@ -202,10 +229,10 @@ export class Game {
     return null;
   }
 
-  onZombieHit(z, dist) {
+  onZombieHit(z, dist, grabChance = 0.35) {
     const p = this.player;
     if (!p.alive || this.grab) return;
-    const canGrab = !this.noGrab && this.time - (this.lastGrabEnd || -10) > 6 && Math.random() < 0.35;
+    const canGrab = !this.noGrab && this.time - (this.lastGrabEnd || -10) > 6 && Math.random() < grabChance;
     if (canGrab) this.startGrab(z);
     else {
       p.damage(z.runner ? 14 : 18 + Math.random() * 8, z.pos);

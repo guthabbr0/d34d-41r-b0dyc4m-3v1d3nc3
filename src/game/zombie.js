@@ -1,8 +1,10 @@
 // Zombie actor: perception, flow-field chase, attacks/grabs, hit reactions, gore and ragdoll death.
 import * as THREE from 'three';
 import { Body, BI, makeCharacterMaterial } from './humanoid.js';
-import { Pose, applyPose, poseIdle, poseShamble, poseRun, poseAttack, poseFeed, HitReact } from './anim.js';
+import { Pose, applyPose, poseIdle, poseShamble, poseRun, poseAttack, poseFeed, poseKneelGrab, HitReact } from './anim.js';
 import { Ragdoll } from './ragdoll.js';
+import { CANE, steadyCane } from './kitbody.js';
+import { SURF } from './world.js';
 
 // hit capsules: [bone, fromJoint, toJoint (or null), radius, zone]
 const CAPS = [
@@ -17,8 +19,9 @@ const CAPS = [
   ['R_thigh', 'R_thigh', 'R_shin', 0.08, 'leg'], ['R_shin', 'R_shin', 'R_foot', 0.055, 'leg'],
 ];
 const ZONE_MUL = { head: 4.0, neck: 2.2, torso: 1.0, arm: 0.55, leg: 0.65 };
+const LEG_BONES = [BI.L_thigh, BI.L_shin, BI.L_foot, BI.R_thigh, BI.R_shin, BI.R_foot];
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 let ZID = 0;
 export class Zombie {
@@ -27,7 +30,7 @@ export class Zombie {
     this.game = game;
     this.tpl = template;
     const vmat = { ...(template.opts.mat || {}) };
-    this.material = makeCharacterMaterial(game.assets, vmat);
+    this.material = template.makeMaterial ? template.makeMaterial(opts.look) : makeCharacterMaterial(game.assets, vmat);
     this.body = new Body(template, this.material);
     this.root = this.body.root;
     this.root.name = 'zombie' + this.id;
@@ -71,6 +74,29 @@ export class Zombie {
     this.grabT = 0;
     this.dormantWake = opts.wakeDist ?? 7;
     this.name = opts.name || '';
+    // kit archetypes (kitbody.js ARCHETYPES): stats, gait and special movement
+    this.arch = template.arch || null;
+    this.boundY = 0.95; this.boundR = 1.3;      // cheap ray pre-test sphere (centre height, radius)
+    this.voicePitch = 1;
+    if (this.arch) this.initArch(opts);
+  }
+
+  initArch(opts) {
+    const a = this.arch, R = (r) => r[0] + Math.random() * (r[1] - r[0]);
+    this.crawler = !!a.crawler; this.cane = !!a.cane;
+    if (this.crawler || this.cane) this.runner = false;          // their gaits come from the kit clips
+    if (opts.hp === undefined) this.hp = this.maxHp = a.hp;
+    if (opts.speed === undefined && !this.runner) this.speed = R(a.speed);
+    if (a.reach[1] > 0) this.reach = R(a.reach);
+    this.limp = R(a.limp);
+    this.voicePitch = a.voice;
+    this.clips = this.tpl.clips;
+    this.gait = Math.random();
+    this.sprint = false; this.burstT = 2 + Math.random() * 5;
+    this.auxPose = new Pose();
+    this.caneQ = new THREE.Quaternion(); this.caneClip = false;
+    this.hardHead = this.tpl.hardHead || null;
+    if (this.crawler) { this.radius = 0.34; this.boundY = 0.5; this.boundR = 1.6; }
   }
 
   place(p, yaw = 0) {
@@ -137,20 +163,26 @@ export class Zombie {
           if (d2 < 0.55 * 0.55 && d2 > 1e-6) { const d = Math.sqrt(d2); dir.x += dx / d * (0.55 - d) * 2; dir.z += dz / d * (0.55 - d) * 2; }
         }
         dir.y = 0; dir.normalize();
-        const spd = this.speed * (this.stagger > 0 ? 0.25 : 1) * (dist < 1.6 ? 0.6 : 1);
+        const boost = this.arch ? this.archBoost(dt, dist, direct) : 1;
+        const spd = this.speed * boost * (this.stagger > 0 ? 0.25 : 1) * (dist < 1.6 && !this.crawler ? 0.6 : 1);
         this.vel.x += (dir.x * spd - this.vel.x) * Math.min(1, dt * 4);
         this.vel.z += (dir.z * spd - this.vel.z) * Math.min(1, dt * 4);
         // face movement / player
         const want = Math.atan2(dist < 3 ? toP.x : this.vel.x, dist < 3 ? toP.z : this.vel.z);
         this.yaw = turnTo(this.yaw, want, dt * (this.runner ? 6 : 3.2));
-        if (dist < 1.25 && this.attackCd <= 0 && this.stagger <= 0 && player.alive) {
+        if (this.crawler) {
+          // pounce from a few metres out when it has a clear line (kit windowLeap, scaled to the gap)
+          const facing = (toP.x * Math.sin(this.yaw) + toP.z * Math.cos(this.yaw)) / Math.max(1e-4, dist);
+          if (dist < 3.1 && facing > 0.85 && direct && this.attackCd <= 0 && this.stagger <= 0 && player.alive) this.startPounce(dist);
+        } else if (dist < (this.cane ? 1.45 : 1.25) && this.attackCd <= 0 && this.stagger <= 0 && player.alive) {
           this.state = 'attack'; this.attackT = 0; this.didHit = false;
           g.audio && g.audio.zombieVoice(this, 'attack');
         }
         break;
       }
       case 'attack': {
-        this.attackT += dt / (this.runner ? 0.75 : 1.0);
+        if (this.crawler) { this.updatePounce(dt, dist, toP); break; }
+        this.attackT += dt / (this.runner ? 0.75 : this.cane ? 1.4 : 1.0);
         this.vel.multiplyScalar(0.85);
         this.yaw = turnTo(this.yaw, Math.atan2(toP.x, toP.z), dt * 4);
         if (!this.didHit && this.attackT > 0.48) {
@@ -204,10 +236,13 @@ export class Zombie {
     const p = this.pose.clear();
     const spd = Math.hypot(this.vel.x, this.vel.z);
     this.react.update(dt);
-    switch (this.state) {
+    this.caneClip = false;
+    if (this.crawler) this._poseCrawler(p, dt, spd);
+    else if (this.cane && this.state !== 'feed' && this.state !== 'grab') this._poseCane(p, dt, spd);
+    else switch (this.state) {
       case 'feed': poseFeed(p, this.t); break;
       case 'attack': {
-        poseShamble(p, this.phase, { reach: this.reach, limp: this.limp });
+        poseShamble(p, this.phase, { reach: this.reach, limp: this.limp, lean: this.arch ? this.arch.lean : 0.3 });
         const a = this.tmpPose.clear(); poseAttack(a, this.attackT);
         p.blend(a, Math.min(1, this.attackT * 4) * Math.min(1, (1 - this.attackT) * 5 + 0.2));
         break;
@@ -219,14 +254,15 @@ export class Zombie {
         break;
       }
       default: {
-        if (this.runner && spd > 1.5) {
+        if ((this.runner || this.sprint) && spd > 1.5) {
           this.phase += dt * spd * 2.4;
           poseRun(p, this.phase);
         } else {
           const stride = 0.55 + this.limp * 0.1;
           this.phase += dt * spd / stride * Math.PI;
           const w = Math.min(1, spd / 0.4);
-          poseShamble(p, this.phase, { reach: this.alert ? this.reach : this.reach * 0.3, limp: this.limp, stride: 0.34 + spd * 0.08 });
+          const narrow = this.arch && this.arch.stride;      // pencil skirt: short, tight steps
+          poseShamble(p, this.phase, { reach: this.alert ? this.reach : this.reach * 0.3, limp: this.limp, stride: narrow ? narrow + spd * 0.05 : 0.34 + spd * 0.08, knee: narrow ? 0.65 : 0.9, lean: this.arch ? this.arch.lean : 0.3 });
           if (w < 1) { const idle = this.tmpPose.clear(); poseIdle(idle, this.t, { seed: this.id }); p.blend(idle, 1 - w); }
         }
       }
@@ -236,8 +272,121 @@ export class Zombie {
     const out = this.tmpPose.copy(this.prevPose);
     this.react.applyTo(out);
     applyPose(this.body, out);
+    if (this.cane) { if (this.caneClip) this.body.bones[CANE].quaternion.copy(this.caneQ); else steadyCane(this.body.bones); }
     this.root.position.copy(this.pos);
     this.root.rotation.set(0, this.yaw, 0);
+  }
+
+  // Crawler: the kit's crawl and frenzy gaits blended by ground speed and advanced by distance
+  // covered (metres per gait cycle, kitbody.js), the leap during a pounce, kneeling when it latches on.
+  _poseCrawler(p, dt, spd) {
+    const C = this.clips;
+    if (this.state === 'feed') { poseFeed(p, this.t); return; }
+    if (this.state === 'grab') { poseKneelGrab(p, this.t); return; }
+    if (this.state === 'attack') {
+      C.windowLeap.sample(p, this.attackT);
+      // keep the crouch height, scale the arc above it with the leap length
+      const base = C.crawl.root[1];
+      p.root.y = base + (p.root.y - base) * this.leapV;
+      return;
+    }
+    const g = this.arch.gait, k = THREE.MathUtils.smoothstep(spd, 0.8, 2.2);
+    this.gait = (this.gait + dt * spd / (g.crawl + (g.frenzy - g.crawl) * k)) % 1;
+    C.crawl.sample(p, this.gait * C.crawl.duration);
+    if (k > 0) p.blend(C.frenzy.sample(this.auxPose.clear(), this.gait * C.frenzy.duration), k);
+    const still = 1 - Math.min(1, spd / 0.3);
+    p.addB(BI.head, Math.sin(this.t * 0.8) * 0.15 * still, Math.sin(this.t * 0.37 + this.id) * 0.6 * still, Math.sin(this.t * 0.5) * 0.2 * still);
+    p.addB(BI.chest, Math.sin(this.t * 1.9) * 0.05, 0, 0);
+    p.addB(BI.jaw, 0.08 + Math.max(0, Math.sin(this.t * 3.1 + this.id)) * 0.3);
+  }
+
+  // Grandmother: the kit's cane walk for spine, arms, head and cane over short shuffling steps matched to
+  // ground speed; the kit's cane swing when she attacks.
+  _poseCane(p, dt, spd) {
+    const C = this.clips;
+    if (this.state === 'attack') {
+      const t = this.attackT * C.caneAttack.duration;
+      C.caneAttack.sample(p, t);
+      C.caneAttack.caneQuat(t, this.caneQ); this.caneClip = true;
+      return;
+    }
+    const stride = 0.17;
+    this.phase += dt * spd / stride * Math.PI;
+    const t = (this.phase / (Math.PI * 2)) % 1 * C.caneWalk.duration;
+    C.caneWalk.sample(p, t);
+    C.caneWalk.caneQuat(t, this.caneQ); this.caneClip = true;
+    const legs = this.auxPose.clear();
+    const w = Math.min(1, spd / 0.2);
+    if (w > 0) poseShamble(legs, this.phase, { stride: 0.14 + spd * 0.06, knee: 0.55, limp: 0.2, reach: 0, lean: 0 });
+    for (const b of LEG_BONES) for (let k = 0; k < 3; k++) p.r[b * 3 + k] = p.r[b * 3 + k] * (1 - w) + legs.r[b * 3 + k] * w;
+    p.root.y += legs.root.y * w * 0.5;
+    p.addB(BI.head, 0, Math.sin(this.t * 0.4 + this.id) * 0.3 * (1 - w), 0);
+  }
+
+  // ------------------------------------------------------------------ kit archetypes
+  // Speed multiplier while chasing: erratic commuters sprint in bursts, stalkers rush the last metres,
+  // the grandmother lurches once you are close.
+  archBoost(dt, dist, direct) {
+    const a = this.arch;
+    this.sprint = false;
+    if (a.erratic && this.alert) {
+      this.burstT -= dt;
+      if (this.burstT <= 0) {
+        this.bursting = !this.bursting;
+        this.burstT = this.bursting ? 0.9 + Math.random() * 0.9 : 3 + Math.random() * 4;
+        if (this.bursting && dist < 20) this.game.audio && this.game.audio.zombieVoice(this, 'chase');
+      }
+      if (this.bursting) { this.sprint = true; return 2.7; }
+      // twitching head and shoulders between bursts
+      if (Math.random() < dt * 1.5) { this.react.impulse(BI.head, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 9); this.react.impulse(BI.chest, 0, (Math.random() - 0.5) * 5, 0); }
+    }
+    if (a.stalker && direct && dist < 4.5 && dist > 1.3) { this.sprint = true; return 2.4; }
+    if (a.cane && direct && dist < 2.6) return 2.0;
+    return 1;
+  }
+
+  startPounce(dist) {
+    this.state = 'attack'; this.attackT = 0; this.didHit = false;
+    // horizontal travel of the kit leap is 2.56 m: scale it to land on the player
+    this.leapH = THREE.MathUtils.clamp((dist - 0.55) / 2.56, 0.3, 1.2);
+    this.leapV = THREE.MathUtils.clamp(this.leapH * 1.1, 0.4, 1);
+    this.leapPrev = 0;
+    this.game.audio && this.game.audio.zombieVoice(this, 'attack');
+  }
+
+  updatePounce(dt, dist, toP) {
+    const g = this.game, clip = this.clips.windowLeap;
+    this.attackT += dt * 1.15;
+    if (this.attackT < 0.2) this.yaw = turnTo(this.yaw, Math.atan2(toP.x, toP.z), dt * 8);   // line up before takeoff
+    const tr = clip.travel(this.attackT) * this.leapH, step = tr - this.leapPrev;
+    this.leapPrev = tr;
+    this.vel.set(Math.sin(this.yaw) * step / dt, 0, Math.cos(this.yaw) * step / dt);
+    if (!this.didHit && this.attackT > 0.45 && this.attackT < 1.35 && dist < 1.15 && g.player.alive) {
+      this.didHit = true;
+      const facing = (toP.x * Math.sin(this.yaw) + toP.z * Math.cos(this.yaw)) / Math.max(1e-4, dist);
+      if (facing > 0.3) g.onZombieHit(this, dist, 0.6);
+      if (this.state !== 'attack') return;              // it latched on (grab)
+      this.attackT = Math.max(this.attackT, 1.25);       // bounced off: drop to the floor
+    }
+    if (this.attackT >= clip.duration) { this.state = 'chase'; this.vel.set(0, 0, 0); this.attackCd = 1.2 + Math.random() * 1.2; }
+  }
+
+  // Plate carriers soak torso hits; hardhats and helmets deflect shots above the brow. Sparks, no blood.
+  armourHit(info) {
+    const a = this.arch, zone = info.cap.zone;
+    let plate = zone === 'torso' && a.armor;
+    if (!plate && zone === 'head' && this.hardHead) {
+      const hb = this.body.bones[BI.head];
+      hb.updateWorldMatrix(true, false);
+      const local = _w.copy(info.point).applyMatrix4(_m.copy(hb.matrixWorld).invert());
+      plate = local.y > this.hardHead.brow;
+    }
+    if (!plate) return false;
+    const g = this.game;
+    g.fx.impact(info.point, _v.copy(info.dir).negate(), SURF.METAL, info.dir);
+    g.audio && g.audio.impact(SURF.METAL, info.point);
+    this.react.impulse(zone === 'head' ? BI.head : BI.chest, -6, 0, 0);
+    return true;
   }
 
   // ------------------------------------------------------------------ hit detection
@@ -260,11 +409,11 @@ export class Zombie {
   // ray vs capsules; returns {t, cap} of nearest
   raycast(o, d, maxT, frame) {
     // cheap bounding test first
-    _v.copy(this.dead ? this.ragdoll.p[0] : this.pos).setY(this.dead ? this.ragdoll.p[0].y : 0.95);
+    _v.copy(this.dead ? this.ragdoll.p[0] : this.pos).setY(this.dead ? this.ragdoll.p[0].y : this.boundY);
     const oc = _a.subVectors(o, _v);
     const bproj = oc.dot(d);
     const cdist2 = oc.lengthSq() - bproj * bproj;
-    if (cdist2 > 1.3 * 1.3) return null;
+    if (cdist2 > this.boundR * this.boundR) return null;
     this.updateCaps(frame);
     let best = null;
     for (const c of this.caps) {
@@ -294,10 +443,14 @@ export class Zombie {
       this.body.addBlood(info.point, info.cap.bone, 0.035);
       return;
     }
+    const armour = this.arch ? this.armourHit(info) : false;
+    if (armour) dmg *= zone === 'head' ? 0.3 : this.arch.armor;
     this.hp -= dmg;
     this.wake();
-    this.body.addBlood(info.point, info.cap.bone, zone === 'head' ? 0.04 : 0.05);
-    g.fx.bloodHit(info.point, info.dir, zone === 'head' ? 1.4 : 1, zone);
+    if (!armour) {
+      this.body.addBlood(info.point, info.cap.bone, zone === 'head' ? 0.04 : 0.05);
+      g.fx.bloodHit(info.point, info.dir, zone === 'head' ? 1.4 : 1, zone);
+    }
     // reaction impulses (angles/sec) in local space
     const local = _v.copy(info.dir).applyAxisAngle(_w.set(0, 1, 0), -this.yaw);
     const k = info.force * 0.9;
@@ -308,7 +461,7 @@ export class Zombie {
     else if (zone === 'leg') { this.react.impulse(info.cap.bone, -local.z * 6 * k, 0, 0); this.react.impulse(BI.hips, 0, 0, -local.x * 3 * k); this.stagger = Math.max(this.stagger, 0.5); }
     this.react.push.addScaledVector(_w.copy(info.dir).setY(0), info.force * 0.9);
     if (zone === 'torso' && info.force > 1.5) this.stagger = Math.max(this.stagger, 0.35);
-    if (this.state === 'attack' && dmg > 25) { this.state = 'chase'; this.attackCd = 0.8; }
+    if (this.state === 'attack' && dmg > 25 && !this.crawler) { this.state = 'chase'; this.attackCd = 0.8; }
     if (this.state === 'grab' && dmg > 20) g.releaseGrab && g.releaseGrab(this, true);
     if (this.hp <= 0) {
       if (zone === 'head' && (info.weapon === 'shotgun' || info.damage * ZONE_MUL.head > 170) && info.dist < 6) this.destroyHead(info);

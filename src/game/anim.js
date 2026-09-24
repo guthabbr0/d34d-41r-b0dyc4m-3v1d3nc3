@@ -155,6 +155,26 @@ export function poseFeed(p, t, o = {}) {
   return p;
 }
 
+// Upright kneel, clawing up at a standing victim (the crawler's grab).
+export function poseKneelGrab(p, t) {
+  p.root.set(0, -0.4, 0.06);
+  p.set(BI.hips, -0.05, 0, 0);
+  p.set(BI.spine, 0.2, Math.sin(t * 5) * 0.06, 0);
+  p.set(BI.chest, 0.15 + Math.sin(t * 9) * 0.05, Math.sin(t * 7) * 0.1, 0);
+  p.set(BI.neck, 0.05, 0, 0);
+  p.set(BI.head, -0.3 + Math.sin(t * 9) * 0.1, Math.sin(t * 6) * 0.15, Math.sin(t * 4) * 0.1);
+  p.set(BI.jaw, 0.35 + Math.sin(t * 14) * 0.15);
+  for (const [s, P] of SIDES) {
+    p.set(BI[P + 'thigh'], -0.1, 0, 0.1 * s);
+    p.set(BI[P + 'shin'], 1.6, 0, 0);
+    p.set(BI[P + 'foot'], 0.5, 0, 0);
+    p.set(BI[P + 'upper'], -1.7 + Math.sin(t * 8 + s) * 0.18, -0.55 * s, -0.1 * s);
+    p.set(BI[P + 'fore'], -0.45 + Math.sin(t * 11 + s) * 0.15, 0, 0);
+    p.set(BI[P + 'hand'], -0.3, 0, 0);
+  }
+  return p;
+}
+
 // Crawling/rising from the floor for scripted moments (t 0 lying -> 1 standing).
 export function poseRise(p, t) {
   const k = THREE.MathUtils.smoothstep(t, 0, 1);

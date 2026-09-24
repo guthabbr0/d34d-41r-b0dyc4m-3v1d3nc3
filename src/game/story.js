@@ -837,8 +837,9 @@ export class Story {
 
   makeSwat(pos) {
     const g = this.game;
-    const mat = makeCharacterMaterial(g.assets, g.swatTemplate.opts.mat);
-    const body = new Body(g.swatTemplate, mat);
+    const tpl = g.swatTemplate;
+    const mat = tpl.makeMaterial ? tpl.makeMaterial() : makeCharacterMaterial(g.assets, tpl.opts.mat);
+    const body = new Body(tpl, mat);
     body.eyeMat.color.set(0x333333);
     // rifle
     const rifle = new THREE.Group();
@@ -900,9 +901,10 @@ export class Story {
         const d = to.length();
         if (d > 0.9) { z.pos.addScaledVector(to.normalize(), dt * 1.0); z.vel.set(0, 0, 0); }
         z.yaw = Math.atan2(p.pos.x - z.pos.x, p.pos.z - z.pos.z);
-        const pose = new Pose();
-        if (d > 0.9) { z.phase += dt * 5; poseShamble(pose, z.phase, { reach: 0.8 }); } else poseFeed(pose, z.t);
-        applyPose(z.body, pose); z.root.position.copy(z.pos); z.root.rotation.set(0, z.yaw, 0);
+        // the zombie's own gait (crawlers crawl, the grandmother hobbles), then it feeds
+        if (d > 0.9) z.vel.set(Math.sin(z.yaw), 0, Math.cos(z.yaw)); else z.vel.set(0, 0, 0);
+        z.state = d > 0.9 ? 'chase' : 'feed';
+        z._animate(dt);
         return true;
       };
       A && A.zombieVoice(killer, 'feed');

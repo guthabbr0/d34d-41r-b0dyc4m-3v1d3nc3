@@ -401,7 +401,7 @@ export class Body {
   constructor(template, material) {
     this.t = template;
     this.root = new THREE.Group();
-    this.bones = buildSkeleton(template.J);
+    this.bones = template.buildBones ? template.buildBones() : buildSkeleton(template.J);
     this.skeleton = new THREE.Skeleton(this.bones);
     this.mesh = new THREE.SkinnedMesh(template.geometry, material);
     this.mesh.add(this.bones[0]);
@@ -417,6 +417,15 @@ export class Body {
     this.rest = this.bones.map(b => b.position.clone());
     this.bloodIdx = 0;
     this.lod = 0;
+    this.layer = 0;
+    if (template.kit) {
+      // kit faces have painted eyes: eye shine is emitted by the face shader (kitbody.js), driven
+      // through the same emissiveIntensity the game sets on eye materials
+      const glow = material.userData.u.uEyeGlow;
+      this.eyeMat = { color: new THREE.Color(), dispose() {}, get emissiveIntensity() { return glow.value; }, set emissiveIntensity(v) { glow.value = v; } };
+      this.eyes = new THREE.Group();
+      return;
+    }
     // eyes
     const eyeM = new THREE.MeshStandardMaterial({ color: template.opts.eyeColor ?? (template.opts.zombie ? 0x6e6a5c : 0x9a9690), roughness: 0.12, metalness: 0, emissive: 0xfff4d0, emissiveIntensity: 0 });
     this.eyeMat = eyeM;
