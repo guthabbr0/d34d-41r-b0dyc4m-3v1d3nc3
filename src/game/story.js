@@ -231,16 +231,22 @@ export class Story {
     this.cam.set(seat, new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.14, -Math.PI / 2, 0, 'YXZ')));
     // hands at ten and two on the wheel
     const wheel = car.userData.steering;
+    // (persistent targets: this runs every frame of the drive, so nothing is allocated in it)
+    const carQ = new THREE.Quaternion(), _tmp = new THREE.Vector3();
+    const gripQ = [1, -1].map(side => new THREE.Quaternion().setFromEuler(new THREE.Euler(side * 0.5, Math.PI / 2, -0.6, 'YXZ')));
+    const arm = () => ({ shoulder: new THREE.Vector3(), wrist: new THREE.Vector3(), pole: new THREE.Vector3(), quat: new THREE.Quaternion() });
+    const targets = { R: arm(), L: arm() }, both = [targets.R, targets.L];
     w.customArms = () => {
       car.updateMatrixWorld();
-      const carQ = car.getWorldQuaternion(new THREE.Quaternion());
-      const rim = (side) => V3(0, 0.1, side * 0.16).applyMatrix4(wheel.matrixWorld);
-      const sh = (side) => V3(-0.34, 1.1, -0.42 + side * 0.3).applyMatrix4(car.matrixWorld);
-      const hq = (side) => carQ.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(side * 0.5, Math.PI / 2, -0.6, 'YXZ')));
-      return {
-        R: { shoulder: sh(1), wrist: rim(1).add(V3(-0.07, -0.02, 0.03).applyQuaternion(carQ)), pole: V3(-0.1, 0.5, 0.5).applyMatrix4(car.matrixWorld), quat: hq(1) },
-        L: { shoulder: sh(-1), wrist: rim(-1).add(V3(-0.07, -0.02, -0.03).applyQuaternion(carQ)), pole: V3(-0.1, 0.5, -1.4).applyMatrix4(car.matrixWorld), quat: hq(-1) },
-      };
+      car.getWorldQuaternion(carQ);
+      for (let i = 0; i < 2; i++) {
+        const t = both[i], side = i === 0 ? 1 : -1;
+        t.shoulder.set(-0.34, 1.1, -0.42 + side * 0.3).applyMatrix4(car.matrixWorld);
+        t.wrist.set(0, 0.1, side * 0.16).applyMatrix4(wheel.matrixWorld).add(_tmp.set(-0.07, -0.02, side * 0.03).applyQuaternion(carQ));
+        t.pole.set(-0.1, 0.5, side > 0 ? 0.5 : -1.4).applyMatrix4(car.matrixWorld);
+        t.quat.copy(carQ).multiply(gripQ[i]);
+      }
+      return targets;
     };
     L.headlight.intensity = 1100;
     ui.showHud(false);

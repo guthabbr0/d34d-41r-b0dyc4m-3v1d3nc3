@@ -3,6 +3,19 @@ import { PRESETS } from '../engine/settings.js';
 
 const $ = (id) => document.getElementById(id);
 
+// Write-on-change DOM helpers: the HUD runs every frame, the DOM should only hear about real changes.
+const _last = new WeakMap();
+function memo(el, key, v) {
+  let m = _last.get(el);
+  if (!m) { m = {}; _last.set(el, m); }
+  if (m[key] === v) return false;
+  m[key] = v; return true;
+}
+export function setText(el, v) { if (el && memo(el, 't', v)) el.textContent = v; }
+export function setStyle(el, prop, v) { if (el && memo(el, 's' + prop, v)) el.style[prop] = v; }
+export function setClass(el, cls, on) { if (el && memo(el, 'c' + cls, !!on)) el.classList.toggle(cls, !!on); }
+export function setHidden(el, on) { if (el && memo(el, 'h', !!on)) el.hidden = !!on; }
+
 const SETTINGS_SCHEMA = {
   Graphics: [
     { key: 'quality', label: 'Quality preset', hint: 'Sets everything below. Changing a single option switches to Custom.', type: 'seg', options: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], preset: true },
@@ -11,7 +24,7 @@ const SETTINGS_SCHEMA = {
     { key: 'shadows', label: 'Flashlight shadows', type: 'seg', options: [[0, 'Off'], [1, 'On'], [2, 'High']] },
     { key: 'lightPool', label: 'Dynamic lights', hint: 'How many nearby lamps light the scene at once.', type: 'range', min: 2, max: 8, step: 1, fmt: v => `${v}` },
     { key: 'bodyDetail', label: 'Character detail', hint: 'Applies on next load.', type: 'seg', options: [[0, 'Low'], [1, 'Medium'], [2, 'High']] },
-    { key: 'lowTex', label: 'Reduced textures', hint: 'Halves texture memory. Applies on next load.', type: 'toggle' },
+    { key: 'lowTex', label: 'Reduced textures', hint: 'Caps textures at 256 px (about a quarter of the memory). Applies on next load.', type: 'toggle' },
     { key: 'bloom', label: 'Bloom and lens glare', type: 'toggle' },
     { key: 'motionBlur', label: 'Motion blur', type: 'toggle' },
     { key: 'msaa', label: 'Anti-aliasing (MSAA)', type: 'seg', options: [[0, 'Off'], [4, '4×']] },
@@ -73,7 +86,7 @@ export class UI {
     document.body.classList.toggle('touch', on);
   }
   showTouch(on) { $('touch').hidden = !(on && this.touch); }
-  showHud(on) { $('hud').hidden = !on; }
+  showHud(on) { setHidden($('hud'), !on); }
   showOverlay(on, buffer = false) {
     $('overlay').hidden = !(on && this.settings.get('overlay'));
     $('bcRec').textContent = buffer ? 'BUFFERING · NO AUDIO' : 'REC';
@@ -112,22 +125,25 @@ export class UI {
   flashObjective() { if ($('objText').textContent) { $('objective').classList.add('show'); clearTimeout(this._objT); this._objT = setTimeout(() => $('objective').classList.remove('show'), 5000); } }
   notify(text, dur = 2.4) { const el = $('notify'); el.textContent = text; el.classList.add('show'); this.notifyT = dur; }
   prompt(label) {
-    const el = $('prompt');
-    if (label) { $('promptText').textContent = label; el.classList.add('show'); }
-    else el.classList.remove('show');
-    const u = $('tUse'); if (u) u.hidden = !label;
+    if (label) setText($('promptText'), label);
+    setClass($('prompt'), 'show', !!label);
+    setHidden($('tUse'), !label);
   }
   ammo(w) {
     const cur = w.current;
-    $('ammoMag').textContent = w.ammo[cur];
-    $('ammoRes').textContent = `/ ${w.reserve[cur]}`;
-    $('ammoName').textContent = (w.def.name + (w.state === 'reload' ? ' · RELOADING' : '')).toUpperCase();
-    $('ammo').classList.toggle('low', w.ammo[cur] <= Math.ceil(w.def.mag * 0.25));
+    setText($('ammoMag'), String(w.ammo[cur]));
+    setText($('ammoRes'), `/ ${w.reserve[cur]}`);
+    setText($('ammoName'), (w.def.name + (w.state === 'reload' ? ' · RELOADING' : '')).toUpperCase());
+    setClass($('ammo'), 'low', w.ammo[cur] <= Math.ceil(w.def.mag * 0.25));
   }
+  // Composited transform only (no left/top layout), quantised to 1/4 px so sub-pixel sway does not spam the DOM.
   crosshair(x, y, show) {
     const c = $('cross');
-    c.style.opacity = show && this.settings.get('crosshair') === 'dot' ? 1 : 0;
-    c.style.left = `${x}px`; c.style.top = `${y}px`;
+    const on = show && this.settings.get('crosshair') === 'dot';
+    setStyle(c, 'opacity', on ? '1' : '0');
+    if (!on) return;
+    const qx = Math.round((x - innerWidth / 2) * 4) / 4, qy = Math.round((y - innerHeight / 2) * 4) / 4;
+    setStyle(c, 'transform', `translate3d(${qx}px,${qy}px,0)`);
   }
   hitMarker(kill) {
     const h = $('hitmark');
@@ -136,10 +152,10 @@ export class UI {
     clearTimeout(this._hmT); this._hmT = setTimeout(() => { h.style.opacity = 0; }, kill ? 260 : 120);
   }
   qte(show, progress = 0, touch = false) {
-    $('qte').classList.toggle('show', show);
-    if (show) { $('qteFill').style.width = `${Math.min(100, progress * 100)}%`; $('qteKey').textContent = touch ? 'TAP SHOVE' : 'MASH V / E'; }
+    setClass($('qte'), 'show', show);
+    if (show) { setStyle($('qteFill'), 'transform', `scaleX(${Math.min(1, progress).toFixed(3)})`); setText($('qteKey'), touch ? 'TAP SHOVE' : 'MASH V / E'); }
   }
-  fps(v) { const el = $('fps'); el.hidden = !this.settings.get('showFps'); if (!el.hidden) el.textContent = v; }
+  fps(v) { const el = $('fps'); const on = !!this.settings.get('showFps'); setHidden(el, !on); if (on) setText(el, v); }
 
   subtitle(who, text, radio, dur) {
     const el = $('subs');
@@ -174,9 +190,10 @@ export class UI {
   blackout(on) { const el = $('card'); el.classList.toggle('clear', false); el.querySelector('pre').innerHTML = ''; el.classList.toggle('show', on); }
 
   skipHint(show, progress = 0, touch = false) {
-    $('skip').classList.toggle('show', show);
-    $('skipText').textContent = touch ? 'HOLD ANYWHERE TO SKIP' : 'HOLD SPACE TO SKIP';
-    $('skipRing').style.strokeDashoffset = `${50.3 * (1 - progress)}`;
+    setClass($('skip'), 'show', show);
+    if (!show) return;
+    setText($('skipText'), touch ? 'HOLD ANYWHERE TO SKIP' : 'HOLD SPACE TO SKIP');
+    setStyle($('skipRing'), 'strokeDashoffset', (50.3 * (1 - progress)).toFixed(1));
   }
   playback(text) { const el = $('playback'); el.hidden = !text; if (text) el.textContent = text; }
 
@@ -186,10 +203,13 @@ export class UI {
   }
 
   setClock(sec) {
-    const d = new Date(this.clockBase + sec * 1000 - 5 * 3600 * 1000);
+    const whole = Math.floor(sec);
+    if (whole === this._clockSec) return this._clockStr;
+    this._clockSec = whole;
+    const d = new Date(this.clockBase + whole * 1000 - 5 * 3600 * 1000);
     const p = (n) => String(n).padStart(2, '0');
-    $('bcTime').textContent = `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())} -0500`;
-    return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+    setText($('bcTime'), `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())} -0500`);
+    return (this._clockStr = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`);
   }
 
   // ---------------------------------------------------------------- settings panel

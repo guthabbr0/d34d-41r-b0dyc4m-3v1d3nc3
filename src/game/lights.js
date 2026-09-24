@@ -8,7 +8,10 @@ export const ZONE_RECTS = [
   ['service', 11, -10.4, 15, -8], ['service', 12.6, -20, 15, -10.4],
   ['laundry', 9, -8, 15, 0], ['maint', 5.5, -19.7, 12.6, -15],
   ['court', -15, -36, 15, -20], ['alley', -60, -52, 60, -36],
-  ['lot', -17, 0, 17, 13], ['street', -300, 13, 150, 80],
+  ['lot', -17, 0, 17, 13],
+  // locked rooms (stairwell, storage, 1A, 1D): no openings but their closed doors
+  ['sealed', -15, -8, -9, 0], ['sealed', 5, -8, 9, 0], ['sealed', -15, -19.7, -8.5, -10.4], ['sealed', -8.5, -19.7, -2.5, -15.5], ['sealed', 5.5, -15, 12.6, -10.4],
+  ['street', -300, 13, 150, 80],
 ];
 
 export const ZONE_ADJ = {
@@ -20,9 +23,20 @@ export const ZONE_ADJ = {
 
 export const OUTDOOR = new Set(['street', 'lot', 'court', 'alley']);
 
+// Zone layers for portal culling (portals.js): level meshes live on one three.js layer per zone,
+// layer 0 is always drawn.
+const ALL = ['street', 'lot', 'lobby', 'office', 'corridor', '1B', '1C', 'service', 'laundry', 'maint', 'court', 'alley'];
+const LAYERED = [...ALL, 'sealed'];
+export const ZONE_LAYER = Object.fromEntries(LAYERED.map((z, i) => [z, i + 1]));   // layer 0 = always drawn
+
 export function zoneAt(x, z) {
+  return zoneAtStrict(x, z) || 'street';
+}
+// null outside every zone rectangle (building shells, roof edges, neighbour walls): such geometry is
+// seen from many zones and stays on the always-drawn layer
+export function zoneAtStrict(x, z) {
   for (const [name, x0, z0, x1, z1] of ZONE_RECTS) if (x >= x0 && x <= x1 && z >= z0 && z <= z1) return name;
-  return 'street';
+  return null;
 }
 
 export class LightSource {
@@ -34,6 +48,7 @@ export class LightSource {
     this.zone = o.zone || zoneAt(this.pos.x, this.pos.z);
     this.pattern = o.pattern || 'steady';
     this.emissive = o.emissive || null;     // material(s) whose emissiveIntensity follows the light
+    if (this.emissive) for (const m of [].concat(this.emissive)) m.userData.live = true;   // never merged by signature
     this.emissiveBase = o.emissiveBase ?? (this.emissive ? (Array.isArray(this.emissive) ? this.emissive[0].emissiveIntensity : this.emissive.emissiveIntensity) : 0);
     this.on = o.on ?? true;
     this.priority = o.priority ?? 1;

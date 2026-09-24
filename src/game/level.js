@@ -1,12 +1,13 @@
 // Harlan Court Apartments, 2250 Wexley Ave. Night, rain.
 // World: +X east, +Z south (towards the street). Building footprint x[-15,15] z[-20,0].
 import * as THREE from 'three';
-import { Builder, mergeStatic } from './builder.js';
+import { Builder, mergeStatic, areaZone } from './builder.js';
 import { SURF, Solid } from './world.js';
 import { buildPoliceCar } from './car.js';
 import * as P from './props.js';
-import { LightManager, zoneAt } from './lights.js';
+import { LightManager, zoneAt, zoneAtStrict, ZONE_LAYER } from './lights.js';
 import { mulberry } from '../engine/post.js';
+import { PortalGraph } from './portals.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -15,7 +16,9 @@ export function buildLevel({ assets, M, world, scene, quality }) {
   root.name = 'level';
   scene.add(root);
   const B = new Builder(world);
-  B.zoneFn = zoneAt;
+  // PVS zone tag of a surface: its zone, or 'open' (always drawn) outside every zone rectangle
+  const zoneTag = (x, z) => zoneAtStrict(x, z) || 'open';
+  B.zoneFn = zoneTag;
   const rnd = mulberry(2250);
   const L = {
     root, doors: [], triggers: [], spawns: {}, pickups: [], animated: [], corpses: [], markers: {},
@@ -69,6 +72,7 @@ export function buildLevel({ assets, M, world, scene, quality }) {
       open: 0, target: o.open ?? 0, swing: o.swing ?? 1, locked: o.locked || null, kind: o.kind || 'apartment',
       center: o.axis === 'x' ? V3((o.a + o.b) / 2, 1.1, o.at) : V3(o.at, 1.1, (o.a + o.b) / 2),
       maxAngle: o.maxAngle ?? 1.5,
+      sealed: !!o.locked && !o.unlockable,   // never opens: the baked PVS treats it as a wall
     };
     door.open = door.target;
     door.init = { open: door.target, locked: door.locked };
@@ -157,9 +161,11 @@ export function buildLevel({ assets, M, world, scene, quality }) {
   B.box(-15.6, 0, -36, -15, 6.5, -20.3, m.brickDry, {});
   B.box(15, 0, -36, 15.6, 6.5, -20.3, m.brickDry, {});
   B.box(-17.2, 0, -20.3, -15.3, 8.5, 13, { nx: m.brickDry, px: m.brick, py: m.concreteWall, pz: m.brick, nz: m.brick }, {});   // west neighbour
-  B.box(-60, 0, -52, 60, 7, -48, m.brickDry, {});                  // far side of the alley
-  B.box(-60, 0, -48, -30, 6, -36.3, m.brickDry, {});
-  B.box(30, 0, -48, 60, 6, -36.3, m.brickDry, {});
+  // (the alley's perimeter is seen from the street through the open strip west of the neighbour
+  //  building, so it is always drawn rather than culled with the alley zone)
+  B.box(-60, 0, -52, 60, 7, -48, m.brickDry, { zone: 'open' });   // far side of the alley
+  B.box(-60, 0, -48, -30, 6, -36.3, m.brickDry, { zone: 'open' });
+  B.box(30, 0, -48, 60, 6, -36.3, m.brickDry, { zone: 'open' });
   // alley walls behind the neighbour walls (so the courtyard fence line is the only way in)
   B.box(-30, 0, -36.3, -15, 3.2, -36, m.concreteWall, {});
   B.box(15, 0, -36.3, 30, 3.2, -36, m.concreteWall, {});
@@ -169,6 +175,7 @@ export function buildLevel({ assets, M, world, scene, quality }) {
     const w = 12 + rnd() * 16, h = 8 + rnd() * 16;
     const blk = P.buildBackdropBlock(m, w, h, 12, { brick: rnd() < 0.6, seed: i + 1 });
     blk.position.set(x + w / 2, 0, 38);
+    blk.traverse(o => { if (o.isMesh) o.userData.zone = 'open'; });   // skyline: peeks over the roof from the alley
     root.add(blk);
     world.box(x, 0, 31.5, x + w, h, 44, { blocksSight: true });
     x += w + 1 + rnd() * 3;
@@ -176,6 +183,7 @@ export function buildLevel({ assets, M, world, scene, quality }) {
   // east neighbour lot (dark), low building
   const eastBlk = P.buildBackdropBlock(m, 14, 6, 26, { brick: false, seed: 42 });
   eastBlk.position.set(26, 0, -4); root.add(eastBlk);
+  eastBlk.traverse(o => { if (o.isMesh) o.userData.zone = 'open'; });
   world.box(19, 0, -17, 33, 6, 9, {});
 
   // invisible bounds
@@ -195,7 +203,7 @@ export function buildLevel({ assets, M, world, scene, quality }) {
   addDoor({ name: '1B', axis: 'x', at: -10.4, a: -6, b: -5.1, label: '1B', swing: 1 });
   addDoor({ name: '1C', axis: 'x', at: -10.4, a: 0.6, b: 1.5, label: '1C', open: 0.3, swing: 1 });
   addDoor({ name: '1D', axis: 'x', at: -10.4, a: 8, b: 8.9, label: '1D', locked: 'Locked.' });
-  addDoor({ name: 'maintenance', axis: 'z', at: 11, a: -9.65, b: -8.75, kind: 'metal', locked: 'MAINTENANCE — authorised personnel only. You need a key.', swing: -1 });
+  addDoor({ name: 'maintenance', axis: 'z', at: 11, a: -9.65, b: -8.75, kind: 'metal', locked: 'MAINTENANCE — authorised personnel only. You need a key.', unlockable: true, swing: -1 });
   addDoor({ name: 'maintRoom', axis: 'z', at: 12.6, a: -17.6, b: -16.7, kind: 'metal', open: 0.9, swing: 1 });
   addDoor({ name: 'rearExit', axis: 'x', at: -19.85, a: 13.2, b: 14.2, kind: 'metal', swing: -1, label: null });
   addDoor({ name: 'bath1C', axis: 'x', at: -15.5, a: 3, b: 3.8, locked: 'Something heavy keeps slamming against this door.' });
@@ -496,7 +504,10 @@ export function buildLevel({ assets, M, world, scene, quality }) {
 
   // sky dome
   root.add(buildSky());
-  B.finish(root);
+  // Architectural shells (walls, floors, ceilings) never cast: the only shadow caster is the weapon
+  // light a few cm from the lens, so a wall's shadow is hidden behind the wall itself. Props, doors and
+  // bodies keep casting. This removes the bulk of the flashlight shadow pass.
+  for (const m of B.finish(root)) m.castShadow = false;
   for (const d of L.doors) d.group.userData.dynamic = true;
   car.userData.dynamic = true; bulbPivot.userData.dynamic = true; cl.userData.dynamic = true; tvScreen.userData.dynamic = true;
   canopy.userData.dynamic = true; strobe.userData.dynamic = true; emBox.userData.dynamic = true;
@@ -504,14 +515,35 @@ export function buildLevel({ assets, M, world, scene, quality }) {
   root.updateMatrixWorld(true);
   const wp = new THREE.Vector3();
   root.traverse(o => { if (o.isMesh) { o.getWorldPosition(wp); if (wp.z > 24 || wp.z < -44 || wp.x < -24 || wp.x > 24) o.castShadow = false; } });
-  L.merged = mergeStatic(root, zoneAt);
+  L.merged = mergeStatic(root, zoneTag);
   root.updateMatrixWorld(true);
-  root.traverse(o => { if (o.isMesh && !o.userData.dynamic) { o.matrixAutoUpdate = false; o.updateMatrix(); } });
+  // freeze every static node (groups included): no per-frame matrix composition for scenery
+  const underDynamic = (o) => { for (let q = o; q && q !== root; q = q.parent) if (q.userData.dynamic) return true; return false; };
+  root.traverse(o => { if (o !== root && !underDynamic(o)) { o.matrixAutoUpdate = false; o.updateMatrix(); } });
   // animated objects must keep auto updates
   bulbPivot.traverse(o => { o.matrixAutoUpdate = true; });
   for (const d of L.doors) d.group.traverse(o => { o.matrixAutoUpdate = true; });
   car.traverse(o => { o.matrixAutoUpdate = true; });
   cl.traverse(o => { o.matrixAutoUpdate = true; });
+  // Portal culling: put every static level mesh on its zone layer (portals.js). Anything large, zone-less or
+  // moving between zones (the car, the sky) stays on layer 0 and is always drawn.
+  const roaming = new Set();
+  car.traverse(o => roaming.add(o));
+  const sph = new THREE.Sphere();
+  root.updateMatrixWorld(true);
+  root.traverse(o => {
+    if (!o.isMesh || roaming.has(o) || o.isSkinnedMesh) return;
+    let z = o.userData.zone;
+    if (z === undefined) {
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      sph.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld);
+      z = sph.radius > 12 ? 'big' : areaZone(zoneTag, sph.center.x, sph.center.z, sph.radius);
+    }
+    if (ZONE_LAYER[z]) o.layers.set(ZONE_LAYER[z]);
+  });
+  // runtime portal culling (portals.js): the camera sees its zone plus whatever the open portals reveal
+  L.portals = new PortalGraph(B.openings, L.doors);
+  L.visMaskFor = (camera) => L.portals.mask(camera);
   return L;
 }
 

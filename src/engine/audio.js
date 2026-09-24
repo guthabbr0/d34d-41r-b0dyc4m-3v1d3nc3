@@ -422,10 +422,12 @@ export class AudioEngine {
     if (!this.ready) return null;
     let buf = this.buffers[name];
     if (!buf) {
-      // variants
-      const vars = Object.keys(this.buffers).filter(k => k.startsWith(name) && /\d$/.test(k) && k.slice(name.length).match(/^\d+$/));
+      // variants (name0, name1, ...), resolved once per name
+      const cache = this._vars || (this._vars = {});
+      let vars = cache[name];
+      if (!vars) vars = cache[name] = Object.keys(this.buffers).filter(k => k.startsWith(name) && /^\d+$/.test(k.slice(name.length))).map(k => this.buffers[k]);
       if (!vars.length) return null;
-      buf = this.buffers[vars[(Math.random() * vars.length) | 0]];
+      buf = vars[(Math.random() * vars.length) | 0];
     }
     const c = this.ctx;
     const src = c.createBufferSource();

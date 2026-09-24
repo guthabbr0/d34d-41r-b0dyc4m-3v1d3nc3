@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { buildMesh } from '../engine/sdf.js';
 import { mulberry } from '../engine/post.js';
+import { mergeGeos } from './builder.js';
 
 export const BONES = ['hips', 'spine', 'chest', 'neck', 'head', 'jaw',
   'L_clav', 'L_upper', 'L_fore', 'L_hand', 'R_clav', 'R_upper', 'R_fore', 'R_hand',
@@ -212,7 +213,8 @@ export function anatomy(o = {}) {
 
 // Build a merged skinned geometry from an anatomy (parts meshed at different resolutions).
 export function buildBodyGeometry(an, detail = 2, tears = null) {
-  const hBody = [0.026, 0.021, 0.0165][detail], hFine = [0.0095, 0.0078, 0.0064][detail];
+  // detail 3 is the distance LOD (~4x fewer triangles; fingers merge into mitts, invisible past 7 m)
+  const hBody = [0.026, 0.021, 0.0165, 0.042][detail], hFine = [0.0095, 0.0078, 0.0064, 0.02][detail];
   const parts = [
     buildMesh({ prims: an.body, h: hBody, bones: BONES.length, tears }),
     buildMesh({ prims: an.head, h: hFine, bones: BONES.length }),
@@ -391,6 +393,7 @@ export class BodyTemplate {
     this.an = anatomy(opts);
     this.J = this.an.J;
     this.geometry = buildBodyGeometry(this.an, detail, opts.tears || null);
+    this.geometryLod = buildBodyGeometry(this.an, 3, opts.tears || null);
   }
 }
 
@@ -413,17 +416,22 @@ export class Body {
     this.material = material;
     this.rest = this.bones.map(b => b.position.clone());
     this.bloodIdx = 0;
+    this.lod = 0;
     // eyes
     const eyeM = new THREE.MeshStandardMaterial({ color: template.opts.eyeColor ?? (template.opts.zombie ? 0x6e6a5c : 0x9a9690), roughness: 0.12, metalness: 0, emissive: 0xfff4d0, emissiveIntensity: 0 });
     this.eyeMat = eyeM;
     const hc = [template.J.head[0], template.J.head[1] + 0.095 * (template.opts.height ?? 1), template.J.head[2]];
     const s = template.opts.height ?? 1;
-    for (const x of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.0125 * s, 10, 8), eyeM);
+    // both eyes in one mesh (one draw per body), geometry shared by every body of the template
+    if (!template.eyeGeo) {
+      const sphere = new THREE.SphereGeometry(0.0125 * s, 10, 8);
       // position relative to head bone (bind: head bone world = J.head)
-      e.position.set(0.032 * x * s, (hc[1] - 0.006 * s) - template.J.head[1], (hc[2] + 0.088 * s) - template.J.head[2]);
-      this.bones[BI.head].add(e);
+      template.eyeGeo = mergeGeos([-1, 1].map(x => ({ geo: sphere, matrix: new THREE.Matrix4().makeTranslation(0.032 * x * s, (hc[1] - 0.006 * s) - template.J.head[1], (hc[2] + 0.088 * s) - template.J.head[2]) })));
+      sphere.dispose();
     }
+    this.eyes = new THREE.Mesh(template.eyeGeo, eyeM);
+    this.bones[BI.head].add(this.eyes);
+    this.layer = 0;
   }
 
   // Convert a world-space point to bind space via a bone, and add a blood splat.
@@ -440,6 +448,29 @@ export class Body {
     this.bloodIdx++;
   }
 
+  // Settled corpses: stop composing bone matrices and re-uploading the bone texture every frame.
+  // The skeleton is evaluated once more after freezing (this frame's pose), then held.
+  freeze(on) {
+    if (!!on === !!this.frozen) return;
+    this.frozen = !!on;
+    this.root.traverse(o => { o.matrixAutoUpdate = !on; });
+    const sk = this.skeleton;
+    if (!on) { delete sk.update; return; }
+    let pending = true;
+    sk.update = function () { if (pending) { pending = false; THREE.Skeleton.prototype.update.call(sk); } };
+  }
+  // zone layer for portal culling (portals.js); follows the body as it moves between rooms
+  setLayer(l) {
+    if (l === this.layer) return;
+    this.layer = l;
+    this.mesh.layers.set(l); this.eyes.layers.set(l);
+  }
+  // 0 = full mesh, 1 = distance mesh (same skeleton, skin weights and material channels)
+  setLod(l) {
+    if (l === this.lod) return;
+    this.lod = l;
+    this.mesh.geometry = l ? this.t.geometryLod : this.t.geometry;
+  }
   clearBlood() { for (const v of this.material.userData.u.uBlood.value) v.set(0, 0, 0, 0); this.bloodIdx = 0; }
 
   resetPose() {

@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { World, NavGrid, SURF } from './world.js';
 import { MaterialLib, shared as matShared } from './materials.js';
 import { buildLevel } from './level.js';
-import { zoneAt, OUTDOOR } from './lights.js';
+import { zoneAt, zoneAtStrict, OUTDOOR, ZONE_LAYER } from './lights.js';
+import { mergeStatic } from './builder.js';
 import { Player } from './player.js';
 import { WeaponSystem, WEAPONS } from './weapons.js';
 import { weaponMaterials } from './weaponModels.js';
@@ -31,6 +32,8 @@ export class Game {
     this.frame = 0;
     this.time = 0;
     this.noises = [];
+    this.shadowCastDist = 12;   // m: bodies farther than this skip the flashlight shadow pass
+    this.lodDist = 7;           // m: bodies farther than this draw the coarse mesh
     this.paused = false;
     this.story = null;
     this.hooks = {};
@@ -318,6 +321,11 @@ export class Game {
     else if (type === 'shells') { obj = new THREE.Group(); for (let i = 0; i < 6; i++) { const s = new THREE.Mesh(new THREE.CylinderGeometry(0.0105, 0.0105, 0.065, 8), this.weaponMats.shellRed); s.rotation.z = Math.PI / 2; s.position.set(0, 0.011, (i - 2.5) * 0.024); obj.add(s); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.012, 8), this.weaponMats.brass); b.rotation.z = Math.PI / 2; b.position.set(0.035, 0.011, (i - 2.5) * 0.024); obj.add(b); } label = 'Take 12-gauge shells'; amount = 6; }
     else if (type === 'shotgun') { obj = this.weapons.guns.shotgun.clone(true); obj.visible = true; obj.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.blending = THREE.NormalBlending; o.onBeforeRender = () => {}; o.onAfterRender = () => {}; o.renderOrder = 0; o.castShadow = true; o.visible = true; } }); obj.rotation.set(0, Math.PI / 2 + 0.2, Math.PI / 2); label = 'Take the M88 shotgun'; amount = 4; }
     else if (type === 'keys') { obj = new THREE.Group(); const r = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.003, 6, 16), this.M.chrome); r.rotation.x = Math.PI / 2; obj.add(r); for (let i = 0; i < 3; i++) { const k = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.002, 0.05), this.M.metalBrushed); k.position.set((i - 1) * 0.012, 0, 0.04); k.rotation.y = (i - 1) * 0.3; obj.add(k); } label = 'Take the keys'; }
+    // multi-part pickups (GLTF parts, a row of shells) become one draw per material, on their zone's layer
+    obj.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    mergeStatic(obj, () => '');
+    const layer = ZONE_LAYER[zoneAtStrict(pos.x, pos.z)] || 0;
+    obj.traverse(o => { if (o.isMesh) o.layers.set(layer); });
     obj.position.copy(pos);
     if (opts.rotY !== undefined) obj.rotation.y = opts.rotY;
     this.scene.add(obj);
@@ -396,8 +404,9 @@ export class Game {
     const p = this.player, input = this.input;
     const control = !this.paused && !p.scripted;
     // noises age
-    for (const n of this.noises) n.t -= dt;
-    this.noises = this.noises.filter(n => n.t > 0);
+    let nk = 0;
+    for (const n of this.noises) { n.t -= dt; if (n.t > 0) this.noises[nk++] = n; }
+    this.noises.length = nk;
     p.update(dt, input, this.settings.values);
     // story runs before weapons/viewmodel so scripted cameras and vehicles are in sync this frame
     this.story && this.story.update(dt);
@@ -419,9 +428,24 @@ export class Game {
     this.level.lights.update(dt, this.time, p.camPos, p.zone);
     // viewmodel after the rig is final
     this.weapons.updateView(dt);
-    const flash = { pos: this.weapons.spot.position, dir: _v2.subVectors(this.weapons.spot.target.position, this.weapons.spot.position).normalize(), on: this.weapons.spot.intensity > 0 };
-    const pool = this.level.lights.pool.filter(s => s.light.intensity > 0).map(s => s.light).sort((a, b) => b.intensity / (1 + a.position.distanceToSquared(p.camPos)) - a.intensity / (1 + b.position.distanceToSquared(p.camPos)));
-    this.fx.update(dt, this.time, p.camera, flash, pool.slice(0, 4), p.outdoor || this.nearOutdoor());
+    const spot = this.weapons.spot, flash = this._flash || (this._flash = { pos: null, dir: new THREE.Vector3(), on: false });
+    flash.pos = spot.position; flash.dir.subVectors(spot.target.position, spot.position).normalize(); flash.on = spot.intensity > 0;
+    // brightest-looking pool lights for the particle shader (persistent array, no per-frame garbage)
+    const pool = this._litPool || (this._litPool = []);
+    pool.length = 0;
+    for (const s of this.level.lights.pool) if (s.light.intensity > 0) pool.push(s.light);
+    if (!this._poolCmp) { const cp = p.camPos; this._poolCmp = (a, b) => b.intensity / (1 + b.position.distanceToSquared(cp)) - a.intensity / (1 + a.position.distanceToSquared(cp)); }
+    pool.sort(this._poolCmp);
+    this.fx.update(dt, this.time, p.camera, flash, pool, p.outdoor || this.nearOutdoor());
+    // per-body render budget: flashlight shadows and mesh LOD by distance to the lens
+    const shD2 = this.shadowCastDist * this.shadowCastDist, lodD2 = this.lodDist * this.lodDist;
+    for (const z of this.zombies) {
+      const c = z.dead ? z.ragdoll.p[0] : z.pos;
+      const d2 = (c.x - p.camPos.x) ** 2 + (c.z - p.camPos.z) ** 2;
+      z.body.mesh.castShadow = d2 < shD2;
+      z.body.setLod(d2 > lodD2 ? 1 : 0);
+      if ((this.frame + z.id) % 8 === 0) z.body.setLayer(ZONE_LAYER[zoneAt(c.x, c.z)] || 0);
+    }
     // eye shine: zombies facing a lit flashlight catch the light
     for (const z of this.zombies) {
       if (z.dead) continue;

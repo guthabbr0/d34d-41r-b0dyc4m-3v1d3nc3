@@ -49,7 +49,7 @@ function particleAtlas() {
   return t;
 }
 
-function decalAtlas() {
+function decalAtlas(maxSide = 1024) {
   const S = 256, c = document.createElement('canvas');
   c.width = c.height = S * 4;
   const g = c.getContext('2d');
@@ -99,7 +99,10 @@ function decalAtlas() {
   { const [x, y] = at(14); g.fillStyle = 'rgba(42,3,2,1)'; g.beginPath(); for (let k = 0; k < 24; k++) { const a = k / 24 * 6.28, r = 90 + rnd() * 30; g.lineTo(x + 128 + Math.cos(a) * r, y + 128 + Math.sin(a) * r); } g.fill(); }
   // 15 glass crack
   { const [x, y] = at(15); g.strokeStyle = 'rgba(230,240,255,0.8)'; g.lineWidth = 2; for (let k = 0; k < 12; k++) { const a = rnd() * 6.28; g.beginPath(); g.moveTo(x + 128, y + 128); g.lineTo(x + 128 + Math.cos(a) * 120, y + 128 + Math.sin(a) * 120); g.stroke(); } for (let r = 20; r < 110; r += 30) { g.beginPath(); g.arc(x + 128, y + 128, r, 0, 7); g.stroke(); } }
-  const t = new THREE.CanvasTexture(c);
+  // drawn at 1024 (tile art uses absolute pixel sizes), downsampled once for the low texture budget
+  let out = c;
+  if (maxSide < c.width) { out = document.createElement('canvas'); out.width = out.height = maxSide; const o = out.getContext('2d'); o.imageSmoothingQuality = 'high'; o.drawImage(c, 0, 0, maxSide, maxSide); }
+  const t = new THREE.CanvasTexture(out);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
@@ -218,7 +221,14 @@ class ParticleLayer {
       vel[i * 3] = p.vel.x; vel[i * 3 + 1] = p.vel.y; vel[i * 3 + 2] = p.vel.z;
     }
     this.geo.instanceCount = w;
-    this.aPos.needsUpdate = this.aCol.needsUpdate = this.aMisc.needsUpdate = this.aVel.needsUpdate = true;
+    // upload only the live range (the arrays are sized for the worst case), nothing when idle
+    if (w > 0 || this.lastW > 0) {
+      for (const a of [this.aPos, this.aCol, this.aMisc, this.aVel]) {
+        a.clearUpdateRanges();
+        if (w > 0) { a.addUpdateRange(0, w * a.itemSize); a.needsUpdate = true; }
+      }
+    }
+    this.lastW = w;
   }
   clear() { this.list.length = 0; this.geo.instanceCount = 0; }
 }
@@ -321,9 +331,11 @@ export class FX {
       uFogDensity: { value: 0.02 }, uFogColor: { value: new THREE.Color(0x050608) },
     };
     this.atlas = particleAtlas();
-    this.decalAtlas = decalAtlas();
-    this.alpha = new ParticleLayer(scene, this.atlas, 900, false, this.shared);
-    this.add = new ParticleLayer(scene, this.atlas, 300, true, this.shared);
+    this.decalAtlas = decalAtlas((game.settings.get('texCap') || 1024) <= 256 || game.settings.get('lowTex') ? 512 : 1024);
+    // live-particle caps per tier (overdraw budget): low 300, medium 800, high/ultra 1200
+    const cap = { low: [220, 80], medium: [600, 200], high: [900, 300], ultra: [900, 300] }[game.settings.get('quality')] || [600, 200];
+    this.alpha = new ParticleLayer(scene, this.atlas, cap[0], false, this.shared);
+    this.add = new ParticleLayer(scene, this.atlas, cap[1], true, this.shared);
     this.decals = new Decals(scene, this.decalAtlas);
     // blood pools
     this.pools = [];
@@ -417,7 +429,7 @@ export class FX {
     // obj: a cloned magazine mesh in world space
     this.scene.add(obj);
     this.mags.push({ obj, vel: vel.clone(), spin: new THREE.Vector3((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8), rest: false, age: 0 });
-    if (this.mags.length > 8) { const m = this.mags.shift(); this.scene.remove(m.obj); }
+    if (this.mags.length > (this.game.settings.get('quality') === 'low' ? 3 : 8)) { const m = this.mags.shift(); this.scene.remove(m.obj); }
   }
 
   impact(point, normal, surf, dir) {

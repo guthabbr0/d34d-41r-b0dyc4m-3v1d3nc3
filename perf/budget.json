@@ -1,0 +1,19 @@
+{
+  "frameJsMsP95": 8,
+  "timerJsMsPerSec": 100,
+  "drawsPerFrame": 150,
+  "trisPerFrame": 300000,
+  "uploadKbPerFrame": 256,
+  "syncQueriesPerFrame": 0,
+  "attribLookupsPerFrame": 0,
+  "uniformCallsPerFrame": 1100,
+  "programSwitchesPerFrame": 40,
+  "domMutationsPerSec": 30,
+  "layoutsPerSec": 10,
+  "audioNodesPerSec": 60,
+  "decodedAudioMb": 24,
+  "textureMb": 64,
+  "heapGrowthMbPerPhase": 8,
+  "fboCreatesSteadyState": 0,
+  "shaderCompilesSteadyState": 0
+}

@@ -6,9 +6,10 @@ import { Settings, isTouchDevice } from './engine/settings.js';
 import { Input } from './engine/input.js';
 import { AudioEngine } from './engine/audio.js';
 import { VoiceSystem } from './engine/voice.js';
-import { UI } from './ui/ui.js';
+import { UI, setStyle, setClass } from './ui/ui.js';
 import { Game } from './game/game.js';
 import { Story } from './game/story.js';
+import { zoneAt } from './game/lights.js';
 
 const MARKER_KEY = 'deadair.marker.v1';
 const q = new URLSearchParams(location.search);
@@ -38,8 +39,9 @@ class App {
     this.lastHud = '';
     this.fpsAcc = 0; this.fpsN = 0; this.fpsT = 0;
     this.time = 0;
+    this.cpu = { sim: 0, render: 0 };   // main-thread ms per frame (EMA): simulation, render submission
     this.worldMuted = false;
-    window.__DA = { ready: false, app: this, THREE };
+    window.__DA = { ready: false, app: this, THREE, zoneAt };
     this.bindUI();
     this.ui.onSettingChange = (k) => this.applySettings(k);
     this.input.onUnlock = () => { if (this.state === 'play' && !this.paused && !this.story.cutscene) this.pause(true); };
@@ -88,6 +90,7 @@ class App {
     ui.loadProgress(0.01, 'Opening evidence container');
     const assets = new Assets(this.renderer);
     assets.lowTex = this.settings.get('lowTex');
+    assets.texCap = this.settings.get('texCap') || 1024;
     assets.anisotropy = Math.min(this.renderer.maxAnisotropy, { low: 2, medium: 4, high: 8, ultra: 16 }[this.settings.get('quality')] || 4);
     this.assets = assets;
     await assets.loadAll((p, l) => ui.loadProgress(p * 0.45, 'Decoding textures and props'));
@@ -106,8 +109,8 @@ class App {
     await new Promise(r => setTimeout(r, 0));
     this.setupMenuScene();
     try { this.renderer.gl.compile(this.game.scene, this.game.player.camera); } catch (e) { /* optional */ }
-    // one throw-away frame to upload everything
-    this.renderFrame(1 / 60);
+    // one throw-away frame (every zone) to upload all geometry and textures up front
+    this.renderFrame(1 / 60, true);
     ui.loadProgress(1, 'Integrity verified');
     this.audio.startAmbience();
     await new Promise(r => setTimeout(r, 450));
@@ -125,6 +128,7 @@ class App {
     if (g.level.lights.pool.length !== s.lightPool) g.level.lights.setPool(s.lightPool);
     g.fx.setRainDensity(s.rain);
     g.weapons.spot.castShadow = s.shadows > 0;
+    g.weapons.shadowFar = { low: 10, medium: 14, high: 16, ultra: 20 }[s.quality] ?? 14;   // m: shadow-pass caster reach
     const sz = s.shadows > 1 ? Math.max(1024, s.shadowSize) : s.shadowSize;
     if (g.weapons.spot.shadow.mapSize.x !== sz) { g.weapons.spot.shadow.mapSize.set(sz, sz); if (g.weapons.spot.shadow.map) { g.weapons.spot.shadow.map.dispose(); g.weapons.spot.shadow.map = null; } }
     this.audio.applyVolumes();
@@ -238,14 +242,15 @@ class App {
   // ---------------------------------------------------------------- per frame
   loop(now) {
     requestAnimationFrame(this.loop);
-    let dt = Math.min(0.05, (now - this.last) / 1000);
+    const rawDt = (now - this.last) / 1000;
+    let dt = Math.min(0.05, rawDt);
     this.last = now;
     if (q.get('fixed')) dt = 1 / 30;
     if (dt <= 0) return;
     this.time += dt;
     window.__DA.frames = (window.__DA.frames || 0) + 1;
     this.fpsAcc += dt; this.fpsN++;
-    if (this.fpsAcc > 0.5) { this.ui.fps(`${Math.round(this.fpsN / this.fpsAcc)} fps · ${this.renderer.w}×${this.renderer.h}`); this.fpsAcc = 0; this.fpsN = 0; }
+    if (this.fpsAcc > 0.5) { this.ui.fps(`${Math.round(this.fpsN / this.fpsAcc)} fps · ${this.renderer.w}×${this.renderer.h} · sim ${this.cpu.sim.toFixed(1)} ms · draw ${this.cpu.render.toFixed(1)} ms · ${this.renderer.sceneInfo ? this.renderer.sceneInfo.calls : 0} calls`); this.fpsAcc = 0; this.fpsN = 0; }
     if (!this.game || this.state === 'gate' || this.state === 'loading') { this.input.endFrame(); return; }
     const g = this.game, p = g.player, input = this.input;
     input.update(dt);
@@ -255,7 +260,9 @@ class App {
         this.handleSkip(dt);
         this.aimAssist(dt);
         const turbo = +(q.get('turbo') || 1);
+        const t0 = performance.now();
         for (let i = 0; i < turbo; i++) { g.update(dt); if (i < turbo - 1) { input.endFrame(); } }
+        this.cpu.sim += (performance.now() - t0 - this.cpu.sim) * 0.05;
       }
     } else if (this.state === 'menu') {
       this.menuUpdate(dt);
@@ -268,8 +275,10 @@ class App {
     this.updateAudio(dt);
     this.updateHud(dt);
     this.updatePost(dt);
+    const r0 = performance.now();
     this.renderFrame(dt);
-    this.renderer.trackFrame(dt, this.time);
+    this.cpu.render += (performance.now() - r0 - this.cpu.render) * 0.05;   // submission cost (EMA, ms)
+    this.renderer.trackFrame(rawDt, this.time);   // unclamped: the scaler must see (and ignore) real hitches
     input.endFrame();
   }
 
@@ -348,7 +357,7 @@ class App {
     const key = `${w.current}${w.ammo[w.current]}${w.reserve[w.current]}${w.state === 'reload'}`;
     if (key !== this.lastHud) { this.lastHud = key; ui.ammo(w); }
     const showHud = !s.cutscene;
-    $('ammo').style.opacity = showHud ? 0.92 : 0;
+    setStyle($('ammo'), 'opacity', showHud ? '0.92' : '0');
     ui.prompt(showHud && g.interactTarget ? g.interactTarget.label : null);
     // crosshair: project the aim point, then through the inverse lens
     if (showHud && p.alive && !this.paused) {
@@ -363,7 +372,7 @@ class App {
       ui.crosshair(su * innerWidth, (1 - sv) * innerHeight, p.ads < 0.6 && !g.grab);
     } else ui.crosshair(0, 0, false);
     if (g.grab) ui.qte(true, g.grab.progress, this.touch);
-    $('touch').classList.toggle('ads', p.ads > 0.5);
+    setClass($('touch'), 'ads', p.ads > 0.5);
   }
 
   updatePost(dt) {
@@ -387,9 +396,14 @@ class App {
     cam.near = 0.03;
   }
 
-  renderFrame(dt) {
-    const g = this.game;
-    this.renderer.render(g.scene, g.player.camera, dt, this.time);
+  renderFrame(dt, all = false) {
+    const g = this.game, cam = g.player.camera;
+    // portal culling: draw only the zones visible through open doorways and windows
+    cam.aspect = this.renderer.aspect; cam.updateProjectionMatrix();
+    cam.updateMatrixWorld();
+    cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+    cam.layers.mask = all ? 0xffffffff : g.level.visMaskFor(cam);
+    this.renderer.render(g.scene, cam, dt, this.time);
   }
 }
 

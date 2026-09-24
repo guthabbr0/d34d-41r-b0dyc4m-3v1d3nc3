@@ -3,3 +3,5 @@ tools/.cache/
 dist/
 *.log
 .DS_Store
+perf/run-*/*.png
+perf/run-*/*.cpuprofile

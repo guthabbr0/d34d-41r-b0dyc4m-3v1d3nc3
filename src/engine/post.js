@@ -147,6 +147,7 @@ varying vec2 vUv;
 
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float hash13(vec3 p3) { p3 = fract(p3 * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
+vec3 hash33(vec3 p3) { p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yxz + 33.33); return fract((p3.xxy + p3.yxx) * p3.zyx); }
 
 vec3 filmic(vec3 x) {
   // ACES fitted (Narkowicz) with a slightly harder toe to crush blacks like a small sensor
@@ -183,15 +184,18 @@ void main() {
     if (hash13(vec3(blk, floor(uTime * 12.0))) < uGlitch * 0.12) uv += (vec2(hash12(blk), hash12(blk + 3.1)) - 0.5) * 0.05;
   }
 
-  // --- lens water drops (outdoor rain) ---
-  vec4 drop = texture2D(tDrops, vUv);
+  // --- lens water drops (outdoor rain; the tap is skipped indoors) ---
+  vec4 drop = vec4(0.5, 0.5, 0.0, 0.0);
+  if (uDrops > 0.0) drop = texture2D(tDrops, vUv);
   vec2 dropOff = (drop.rg - 0.5) * 0.06 * drop.b * uDrops;
   uv += dropOff;
 
+  // lateral CA is a per-channel magnification about the optical centre, so one lens evaluation
+  // (one tan) serves all three channels
   float ca = uCA * 0.006 + uInfect * 0.004 * (0.6 + 0.4 * sin(uTime * 2.3)) + uGlitch * 0.01;
-  vec2 uvR = lens(uv, 1.0 + ca, aspect);
   vec2 uvG = lens(uv, 1.0, aspect);
-  vec2 uvB = lens(uv, 1.0 - ca, aspect);
+  vec2 uvR = (uvG - 0.5) * (1.0 + ca) + 0.5;
+  vec2 uvB = (uvG - 0.5) * (1.0 - ca) + 0.5;
 
   vec4 cg = texture2D(tColor, uvG);
   vec3 col = vec3(texture2D(tColor, uvR).r, cg.g, texture2D(tColor, uvB).b);
@@ -213,9 +217,11 @@ void main() {
   if (uvG.x < 0.0 || uvG.x > 1.0 || uvG.y < 0.0 || uvG.y > 1.0) col = vec3(0.0);
 
   // bloom / veiling glare + lens dirt
-  vec3 bloom = texture2D(tBloom, uvG).rgb;
-  vec3 dirt = texture2D(tDirt, vUv).rgb;
-  col = col + bloom * (uBloom + dirt * uDirt);
+  if (uBloom > 0.0) {
+    vec3 bloom = texture2D(tBloom, uvG).rgb;
+    vec3 dirt = uDirt > 0.0 ? texture2D(tDirt, vUv).rgb : vec3(0.0);
+    col = col + bloom * (uBloom + dirt * uDirt);
+  }
 
   // water drops darken/brighten edges slightly
   col *= 1.0 - drop.b * uDrops * 0.15 + drop.a * uDrops * 0.1;
@@ -262,11 +268,13 @@ void main() {
   float gain = clamp(log2(max(exposure, 1e-6)) * 0.12 + 0.6, 0.35, 1.6);
   vec2 fc = gl_FragCoord.xy;
   float t = fract(uFrame * 0.618);
-  float n1 = hash13(vec3(fc, t * 911.0)) + hash13(vec3(fc + 17.0, t * 577.0)) - 1.0;
-  vec3 nc = vec3(hash13(vec3(fc, t * 131.0)), hash13(vec3(fc, t * 257.0)), hash13(vec3(fc, t * 389.0))) - 0.5;
-  float ly = dot(outc, vec3(0.299, 0.587, 0.114));
-  float amp = uGrain * gain * (0.015 + 0.075 * pow(1.0 - ly, 2.2));
-  outc += n1 * amp + nc * amp * 0.45;
+  if (uGrain > 0.0) {
+    float n1 = hash13(vec3(fc, t * 911.0)) + hash13(vec3(fc + 17.0, t * 577.0)) - 1.0;
+    vec3 nc = hash33(vec3(fc, t * 131.0)) - 0.5;
+    float ly = dot(outc, vec3(0.299, 0.587, 0.114));
+    float amp = uGrain * gain * (0.015 + 0.075 * pow(1.0 - ly, 2.2));
+    outc += n1 * amp + nc * amp * 0.45;
+  }
 
   // flashes, fades
   outc = mix(outc, vec3(1.0), uFlash);

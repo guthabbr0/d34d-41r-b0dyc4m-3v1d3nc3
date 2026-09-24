@@ -86,6 +86,8 @@ export function buildDoor(M, { width = 0.9, height = 2.05, kind = 'apartment', l
   frame.add(box(0.06, height + 0.05, 0.16, fm, -0.03, (height + 0.05) / 2, 0));
   frame.add(box(0.06, height + 0.05, 0.16, fm, width + 0.03, (height + 0.05) / 2, 0));
   frame.add(box(width + 0.12, 0.06, 0.16, fm, width / 2, height + 0.03, 0));
+  // one draw per material for the whole leaf: uniform shadow flags so knobs and plates share a bucket
+  leaf.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   mergeStatic(leaf, () => '');
   return { group, pivot, leaf, frame };
 }

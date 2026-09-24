@@ -25,8 +25,8 @@ export class Renderer {
     this.minScale = 0.5;
     this.dynamic = true;
     this.dprCap = 2;
-    this.frameTimes = [];
     this.lastAdjust = 0;
+    this.slowN = 0; this.fastN = 0; this.upWait = 150; this.refDt = 0; this.lastUp = -99;
     this.targetFps = 58;
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -73,22 +73,31 @@ export class Renderer {
     this.post.setSize(w, h, force);
   }
 
-  // Dynamic resolution: nudges render scale to hold the target frame rate.
+  // Dynamic resolution. Tracks the display's own frame interval (fastest recent frame, slowly decaying)
+  // so a 60 Hz panel can still "prove" headroom: 20 slow frames step down, a run of frames at the
+  // display rate steps back up. Hitches over 250 ms (tab switch, GC, compile) are ignored, steps are
+  // quantised to 0.05 so render targets are not reallocated for tiny changes, and an upgrade that is
+  // immediately undone doubles the wait before the next attempt (no oscillation).
   trackFrame(dt, now) {
-    if (!this.dynamic) return;
-    this.frameTimes.push(dt);
-    if (this.frameTimes.length > 45) this.frameTimes.shift();
-    if (now - this.lastAdjust < 1.5 || this.frameTimes.length < 30) return;
-    const sorted = [...this.frameTimes].sort((a, b) => a - b);
-    const p75 = sorted[Math.floor(sorted.length * 0.75)];
+    if (!this.dynamic || dt <= 0) return;
+    if (dt > 0.25) { this.slowN = 0; this.fastN = 0; return; }
+    if (dt > 0.004) this.refDt = Math.min(dt, (this.refDt || dt) * 1.002 + 0.00001);   // ignore rAF double-fires
     const target = 1 / this.targetFps;
+    const slow = dt > target * 1.1;
+    const fast = dt < Math.max(this.refDt * 1.15, target * 0.85);
+    if (slow) { this.slowN = (this.slowN || 0) + 1; this.fastN = 0; }
+    else if (fast) { this.fastN = (this.fastN || 0) + 1; this.slowN = Math.max(0, (this.slowN || 0) - 1); }
     let ns = this.scale;
-    if (p75 > target * 1.12) ns = Math.max(this.minScale, this.scale - 0.08);
-    else if (p75 < target * 0.8) ns = Math.min(this.maxScale, this.scale + 0.05);
-    if (Math.abs(ns - this.scale) > 0.001) {
-      this.scale = ns; this.lastAdjust = now; this.frameTimes.length = 0;
-      this.resize();
+    if (this.slowN >= 20) {
+      ns = Math.max(this.minScale, this.scale - (dt > target * 1.6 ? 0.1 : 0.05));
+      if (now - (this.lastUp || -99) < 3) this.upWait = Math.min(1200, (this.upWait || 150) * 2);
+      this.slowN = 0; this.fastN = 0;
+    } else if (this.fastN >= (this.upWait || 150) && this.scale < this.maxScale) {
+      ns = Math.min(this.maxScale, this.scale + 0.05);
+      this.fastN = 0; this.lastUp = now;
     }
+    ns = Math.round(ns * 20) / 20;
+    if (Math.abs(ns - this.scale) > 0.001) { this.scale = ns; this.lastAdjust = now; this.resize(); }
   }
 
   render(scene, camera, dt, time) {

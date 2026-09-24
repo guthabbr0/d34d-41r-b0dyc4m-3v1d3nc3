@@ -74,7 +74,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .qte-label { font-family: var(--display); font-weight: 900; font-size: clamp(22px, 3vw, 38px); letter-spacing: .06em; color: #fff; text-shadow: 0 2px 6px #000; }
 .qte-key { display: inline-block; margin: 6px 0; font-family: var(--mono); font-weight: 600; font-size: 18px; background: var(--tape); color: var(--tape-ink); padding: 2px 12px; }
 .qte-bar { width: min(40vw, 320px); height: 6px; background: rgba(255,255,255,.2); margin: 4px auto 0; }
-.qte-bar i { display: block; height: 100%; width: 0; background: var(--tape); }
+.qte-bar i { display: block; height: 100%; width: 100%; background: var(--tape); transform: scaleX(0); transform-origin: 0 50%; }
 @keyframes shake { 0%{transform:translate(-50%,0)} 50%{transform:translate(calc(-50% + 2px),-1px)} 100%{transform:translate(calc(-50% - 2px),1px)} }
 #fps { position: absolute; left: calc(16px + var(--sal)); bottom: calc(10px + var(--sab)); font-family: var(--mono); font-size: 11px; color: var(--mute); text-shadow: 0 1px 2px #000; }
 

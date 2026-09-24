@@ -28,6 +28,7 @@ export class Assets {
     this.env = {};       // id -> PMREM texture
     this.anisotropy = 4;
     this.lowTex = false;
+    this.texCap = 1024;     // max texture side (px) for normal/ORM maps and model textures; albedo gets 2x
     this.base = 'assets/';
   }
 
@@ -41,12 +42,14 @@ export class Assets {
     const total = TEXTURE_SETS.length * 3 + MODELS.length + HDRIS.length;
     const tick = (label) => { done++; onProgress && onProgress(done / total, label); };
 
+    // texture budget per preset (perf/README.md): resident GPU memory is dominated by texture sides
+    const cap = this.lowTex ? Math.min(256, this.texCap) : this.texCap;
     const loadTex = (url, srgb) => new Promise((res) => {
       texLoader.load(url, (t) => {
         t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
         t.anisotropy = this.anisotropy;
-        if (this.lowTex) downscaleTexture(t, 512);
+        downscaleTexture(t, srgb && cap >= 512 ? cap * 2 : cap);   // albedo keeps 2x the cap from MEDIUM up
         res(t);
       }, undefined, () => { console.warn('texture failed', url); res(null); });
     });
@@ -62,12 +65,19 @@ export class Assets {
       jobs.push(new Promise(res => {
         gltfLoader.load(`${this.base}models/${id}.glb`, (g) => {
           const root = g.scene;
+          const done = new Set();
           root.traverse(o => {
             if (o.isMesh) {
               o.castShadow = true; o.receiveShadow = true;
               const m = o.material;
               if (m) {
-                for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap']) if (m[k]) m[k].anisotropy = Math.min(4, this.anisotropy);
+                for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
+                  const t = m[k];
+                  if (!t) continue;
+                  t.anisotropy = Math.min(4, this.anisotropy);
+                  // props: albedo at the cap, normal/ORM at half (fine detail on small props is invisible)
+                  if (!done.has(t)) { done.add(t); downscaleTexture(t, k === 'map' || k === 'emissiveMap' ? cap : Math.max(128, cap / 2)); }
+                }
                 if (m.transparent && m.alphaMap == null && !m.map?.format) m.transparent = false;
                 m.envMapIntensity = 0.6;
               }
@@ -114,6 +124,10 @@ function downscaleTexture(t, max) {
   const s = max / Math.max(img.width, img.height);
   const c = document.createElement('canvas');
   c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(img, 0, 0, c.width, c.height);
+  if (img.close) img.close();          // ImageBitmap from GLTFLoader: free the full-size decode
   t.image = c;
+  t.needsUpdate = true;
 }

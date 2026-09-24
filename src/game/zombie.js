@@ -111,7 +111,7 @@ export class Zombie {
       let sees = false;
       if (dist < 16 && (frame + this.id) % 10 === 0) {
         _a.copy(this.pos).setY(1.6); _b.copy(player.pos).setY(1.4);
-        const facing = toP.clone().normalize().dot(_w.set(Math.sin(this.yaw), 0, Math.cos(this.yaw)));
+        const facing = (toP.x * Math.sin(this.yaw) + toP.z * Math.cos(this.yaw)) / Math.max(1e-4, dist);
         sees = (facing > 0.2 || player.flashlightOn && dist < 9) && g.world.lineOfSight(_a, _b);
       }
       if (near || noise > 0.5 || (sees && this.state !== 'dormant') || this.hp < this.maxHp) this.wake();
@@ -155,7 +155,7 @@ export class Zombie {
         this.yaw = turnTo(this.yaw, Math.atan2(toP.x, toP.z), dt * 4);
         if (!this.didHit && this.attackT > 0.48) {
           this.didHit = true;
-          const facing = toP.clone().normalize().dot(_w.set(Math.sin(this.yaw), 0, Math.cos(this.yaw)));
+          const facing = (toP.x * Math.sin(this.yaw) + toP.z * Math.cos(this.yaw)) / Math.max(1e-4, dist);
           if (dist < 1.45 && facing > 0.5 && player.alive) g.onZombieHit(this, dist);
         }
         if (this.attackT >= 1) { this.state = 'chase'; this.attackCd = 0.6 + Math.random() * 0.8; }
@@ -367,6 +367,7 @@ export class Zombie {
   dispose() {
     this.game.scene.remove(this.root);
     this.material.dispose();
+    this.body.eyeMat.dispose();
     if (this.bloodPool) { this.bloodPool.parent && this.bloodPool.parent.remove(this.bloodPool); }
   }
 }

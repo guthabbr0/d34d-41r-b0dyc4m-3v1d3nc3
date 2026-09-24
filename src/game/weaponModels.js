@@ -222,6 +222,18 @@ export function makeArmMesh(armData, material) {
 const _ab = new THREE.Vector3(), _at = new THREE.Vector3(), _n = new THREE.Vector3(), _el = new THREE.Vector3(), _m4 = new THREE.Matrix4();
 const _UPV = new THREE.Vector3(0, 1, 0), _RIGHTV = new THREE.Vector3(1, 0, 0);
 const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _qp = new THREE.Quaternion(), _qw = new THREE.Quaternion();
+const _ikDir = new THREE.Vector3(), _ikUp = new THREE.Vector3(), _ikTo = new THREE.Vector3();
+const _qU = new THREE.Quaternion(), _qF = new THREE.Quaternion();
+function orientBasis(from, to, up, out) {
+  _z.subVectors(to, from).normalize();
+  _x.crossVectors(up, _z);
+  if (_x.lengthSq() < 1e-8) _x.crossVectors(Math.abs(_z.y) < 0.9 ? _UPV : _RIGHTV, _z);
+  _x.normalize();
+  _y.crossVectors(_z, _x);
+  _m4.makeBasis(_x, _y, _z);
+  return out.setFromRotationMatrix(_m4);
+}
+// Two-bone IK, allocation free (runs twice per frame for the viewmodel arms).
 export function solveArmIK(arm, root, shoulder, wrist, pole, handQuat) {
   // arm: {bones,U,F}; root: object3D the mesh is attached to (world space at identity)
   const U = arm.U, F = arm.F;
@@ -229,7 +241,7 @@ export function solveArmIK(arm, root, shoulder, wrist, pole, handQuat) {
   let d = _at.length();
   const maxD = (U + F) * 0.999;
   if (d > maxD) { _at.multiplyScalar(maxD / d); d = maxD; }
-  const dir = _at.clone().normalize();
+  const dir = _ikDir.copy(_at).normalize();
   // elbow position via law of cosines
   const a = (U * U - F * F + d * d) / (2 * d);
   const h = Math.sqrt(Math.max(0, U * U - a * a));
@@ -238,17 +250,9 @@ export function solveArmIK(arm, root, shoulder, wrist, pole, handQuat) {
   _n.normalize();
   _el.copy(shoulder).addScaledVector(dir, a).addScaledVector(_n, h);
   // upper bone: +Z toward elbow, +Y toward pole-ish
-  const orient = (from, to, up, out) => {
-    _z.subVectors(to, from).normalize();
-    _x.crossVectors(up, _z);
-    if (_x.lengthSq() < 1e-8) _x.crossVectors(Math.abs(_z.y) < 0.9 ? _UPV : _RIGHTV, _z);
-    _x.normalize();
-    _y.crossVectors(_z, _x);
-    _m4.makeBasis(_x, _y, _z);
-    return out.setFromRotationMatrix(_m4);
-  };
-  const qU = orient(shoulder, _el, _n.clone().negate(), new THREE.Quaternion());
-  const qF = orient(_el, shoulder.clone().add(_at), _n.clone().negate(), new THREE.Quaternion());
+  _ikUp.copy(_n).negate();
+  const qU = orientBasis(shoulder, _el, _ikUp, _qU);
+  const qF = orientBasis(_el, _ikTo.copy(shoulder).add(_at), _ikUp, _qF);
   const bones = arm.bones;
   bones[0].position.copy(shoulder);
   bones[0].quaternion.copy(qU);

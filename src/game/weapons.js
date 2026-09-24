@@ -78,6 +78,15 @@ export class WeaponSystem {
     spot.shadow.mapSize.set(game.settings.get('shadowSize'), game.settings.get('shadowSize'));
     spot.shadow.camera.near = 0.15; spot.shadow.camera.far = 40;
     spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.02;
+    // The light reaches 30 m but its shadows only read up close: clamp the shadow frustum so distant
+    // casters are culled from the shadow pass (three.js would otherwise use light.distance as far).
+    this.shadowFar = 16;
+    const baseUpdate = spot.shadow.updateMatrices.bind(spot.shadow), ws = this;
+    spot.shadow.updateMatrices = function (light) {
+      const d = light.distance; light.distance = ws.shadowFar;
+      baseUpdate(light);
+      light.distance = d;
+    };
     scene.add(spot, spot.target);
     this.spot = spot;
     // state
@@ -345,7 +354,8 @@ export class WeaponSystem {
     let ox = base.x + bobX + this.swayRot.x * 0.05, oy = base.y + bobY + breath + this.swayRot.y * 0.05 - this.lowered * 0.12, oz = base.z + this.kick * 0.06;
     let rx = this.kick * 0.9 + this.lowered * 0.7 - this.swayRot.y * 0.6, ry = this.swayRot.x * 0.6 + this.lowered * 0.5, rz = -this.swayRot.x * 0.4 + Math.sin(ph) * 0.02 * mv;
     // state animations
-    let magDown = 0, leftOff = new THREE.Vector3(), leftAway = 0;
+    let magDown = 0, leftAway = 0;
+    const leftOff = this._leftOff || (this._leftOff = new THREE.Vector3()); leftOff.set(0, 0, 0);
     if (this.state === 'lower') { const a = ease(t / 0.32); oy -= 0.25 * a; rx += 0.9 * a; }
     if (this.state === 'raise') { const a = 1 - ease(t / 0.35); oy -= 0.25 * a; rx += 0.9 * a; }
     if (this.state === 'shove') {
@@ -400,30 +410,28 @@ export class WeaponSystem {
   }
 
   _arms(leftOff, leftAway) {
-    const p = this.player, gun = this.gun, ud = gun.userData;
-    const yawQ = _q2.setFromEuler(new THREE.Euler(p.pitch * 0.35, p.yaw, 0, 'YXZ'));
-    const body = (x, y, z) => new THREE.Vector3(x, y, z).applyQuaternion(yawQ).add(p.camPos);
-    const gq = gun.getWorldQuaternion(new THREE.Quaternion());
-    const flipY = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI);
+    const p = this.player, gun = this.gun, ud = gun.userData, A = _arm;
+    const yawQ = _q2.setFromEuler(_e.set(p.pitch * 0.35, p.yaw, 0, 'YXZ'));
+    const body = (out, x, y, z) => out.set(x, y, z).applyQuaternion(yawQ).add(p.camPos);
+    const gq = gun.getWorldQuaternion(A.gq);
+    const lo = A.lo.copy(leftOff).applyQuaternion(p.aimQuat);
     if (this.current === 'pistol') {
-      const shR = body(-0.26, -0.02, 0.2), shL = body(0.26, -0.02, 0.2);
+      body(A.shR, -0.26, -0.02, 0.2); body(A.shL, 0.26, -0.02, 0.2);
       // right hand: wrist behind/right of the grip, hand frame rotated to face forward
-      const gripTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.32);
-      const hqR = gq.clone().multiply(gripTilt).multiply(flipY);
-      const wR = new THREE.Vector3(0.028, -0.058, 0.07).applyMatrix4(gun.matrixWorld);
-      solveArmIK(this.arms.R_pistol, null, shR, wR, body(-0.55, -0.6, 0.2), hqR);
-      const hqL = gq.clone().multiply(gripTilt).multiply(flipY).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.25));
-      const wL = new THREE.Vector3(-0.046, -0.072, 0.06).applyMatrix4(gun.matrixWorld).add(leftOff.clone().applyQuaternion(p.aimQuat));
-      solveArmIK(this.arms.L_support, null, shL, wL, body(0.55, -0.6, 0.2), leftAway > 0.3 ? p.aimQuat.clone().multiply(flipY) : hqL);
+      const hqR = A.hqR.copy(gq).multiply(GRIP_TILT).multiply(FLIP_Y);
+      A.wR.set(0.028, -0.058, 0.07).applyMatrix4(gun.matrixWorld);
+      solveArmIK(this.arms.R_pistol, null, A.shR, A.wR, body(A.pole, -0.55, -0.6, 0.2), hqR);
+      const hqL = leftAway > 0.3 ? A.hqL.copy(p.aimQuat).multiply(FLIP_Y) : A.hqL.copy(hqR).multiply(SUPPORT_ROLL);
+      A.wL.set(-0.046, -0.072, 0.06).applyMatrix4(gun.matrixWorld).add(lo);
+      solveArmIK(this.arms.L_support, null, A.shL, A.wL, body(A.pole, 0.55, -0.6, 0.2), hqL);
     } else {
-      const shR = body(-0.26, -0.02, 0.22), shL = body(0.26, -0.02, 0.2);
-      const hqR = gq.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.6)).multiply(flipY);
-      const wR = new THREE.Vector3(0.03, -0.075, 0.1).applyMatrix4(gun.matrixWorld);
-      solveArmIK(this.arms.R_wrist, null, shR, wR, body(-0.6, -0.6, 0.1), hqR);
-      const pump = ud.pump;
-      const hqL = gq.clone().multiply(flipY);
-      const wL = new THREE.Vector3(0.0, -0.035, pump.position.z + 0.075).applyMatrix4(gun.matrixWorld).add(leftOff.clone().applyQuaternion(p.aimQuat));
-      solveArmIK(this.arms.L_pump, null, shL, wL, body(0.6, -0.7, 0.3), hqL);
+      body(A.shR, -0.26, -0.02, 0.22); body(A.shL, 0.26, -0.02, 0.2);
+      const hqR = A.hqR.copy(gq).multiply(STOCK_TILT).multiply(FLIP_Y);
+      A.wR.set(0.03, -0.075, 0.1).applyMatrix4(gun.matrixWorld);
+      solveArmIK(this.arms.R_wrist, null, A.shR, A.wR, body(A.pole, -0.6, -0.6, 0.1), hqR);
+      const hqL = A.hqL.copy(gq).multiply(FLIP_Y);
+      A.wL.set(0.0, -0.035, ud.pump.position.z + 0.075).applyMatrix4(gun.matrixWorld).add(lo);
+      solveArmIK(this.arms.L_pump, null, A.shL, A.wL, body(A.pole, 0.6, -0.7, 0.3), hqL);
     }
     this.armRoot.updateMatrixWorld(true);
   }
@@ -434,4 +442,13 @@ export class WeaponSystem {
   }
 }
 const UP = new THREE.Vector3(0, 1, 0);
+const FLIP_Y = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI);
+const GRIP_TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.32);
+const STOCK_TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.6);
+const SUPPORT_ROLL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.25);
+const _arm = {
+  gq: new THREE.Quaternion(), hqR: new THREE.Quaternion(), hqL: new THREE.Quaternion(),
+  shR: new THREE.Vector3(), shL: new THREE.Vector3(), wR: new THREE.Vector3(), wL: new THREE.Vector3(),
+  pole: new THREE.Vector3(), lo: new THREE.Vector3(),
+};
 function p0Blocked(ws) { const p = ws.player; return !!p.grabbedBy || !p.alive; }

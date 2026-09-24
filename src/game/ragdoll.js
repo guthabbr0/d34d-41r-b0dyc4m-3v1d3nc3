@@ -90,6 +90,7 @@ export class Ragdoll {
     body.root.updateMatrixWorld(true);
     this.scale = s;
     this.active = true; this.sleeping = false; this.sleep = 0; this.age = 0;
+    body.freeze(false);
     if (impulse) this.impulse(impulse.point, impulse.dir, impulse.strength, impulse.radius);
   }
 
@@ -113,6 +114,7 @@ export class Ragdoll {
 
   impulse(point, dir, strength = 1, radius = 0.35) {
     this.sleeping = false; this.sleep = 0;
+    this.body.freeze(false);
     for (let i = 0; i < PN.length; i++) {
       const d = this.p[i].distanceTo(point);
       if (d > radius) continue;
@@ -138,6 +140,7 @@ export class Ragdoll {
     maxV = Math.sqrt(maxV) / h;
     if (maxV < 0.05 && this.age > 1) { this.sleep += dt; if (this.sleep > 0.8) this.sleeping = true; } else this.sleep = 0;
     this.apply();
+    if (this.sleeping) this.body.freeze(true);
   }
 
   _substep(h) {
@@ -181,14 +184,13 @@ export class Ragdoll {
     // torso forward = (Lsh-Rsh) x (neck - pelvis)
     tv.subVectors(this.p[P.Lsh], this.p[P.Rsh]); tv2.subVectors(this.p[P.neck], this.p[P.pelvis]);
     fwd.crossVectors(tv, tv2).normalize();
-    for (const [hip, kn, an, toe] of [[P.Lhip, P.Lkn, P.Lan, P.Ltoe], [P.Rhip, P.Rkn, P.Ran, P.Rtoe]]) {
+    for (const [hip, kn, an, toe] of LEGS) {
       const mid = tv.addVectors(this.p[hip], this.p[an]).multiplyScalar(0.5);
       const f = tv2.subVectors(this.p[toe], this.p[an]).normalize();
-      const off = this.p[kn].clone().sub(mid);
-      const d = off.dot(f);
+      const d = _ba.subVectors(this.p[kn], mid).dot(f);
       if (d < 0.02) this.p[kn].addScaledVector(f, (0.02 - d) * 0.5);
     }
-    for (const [sh, el, wr] of [[P.Lsh, P.Lel, P.Lwr], [P.Rsh, P.Rel, P.Rwr]]) {
+    for (const [sh, el, wr] of ARMS) {
       const mid = tv.addVectors(this.p[sh], this.p[wr]).multiplyScalar(0.5);
       const d = tv2.subVectors(this.p[el], mid).dot(fwd);
       if (d > -0.01) this.p[el].addScaledVector(fwd, (-0.01 - d) * 0.5);
@@ -227,24 +229,24 @@ export class Ragdoll {
     }
   }
 
-  // Drive skeleton from particles.
+  // Drive skeleton from particles. Allocation free: runs for every awake ragdoll every frame.
   apply() {
     const body = this.body, bones = body.bones, pp = this.p;
-    const Q = {};   // world rotations
-    const basis = (up, side) => {
+    let qi = 0;
+    const nq = () => _QP[qi++];
+    const basis = (up, sideV) => {
       // columns: x = side (orthogonalised), y = up, z = x cross y
-      const y = up.clone().normalize();
-      const x = side.clone().addScaledVector(y, -side.dot(y)).normalize();
-      const z = new THREE.Vector3().crossVectors(x, y);
-      return new THREE.Quaternion().setFromRotationMatrix(tm.makeBasis(x, y, z));
+      const y = up.normalize();
+      const x = sideV.addScaledVector(y, -sideV.dot(y)).normalize();
+      const z = _bz.crossVectors(x, y);
+      return nq().setFromRotationMatrix(tm.makeBasis(x, y, z));
     };
-    const side = (a, b) => new THREE.Vector3().subVectors(pp[a], pp[b]);
-    const dir = (a, b) => new THREE.Vector3().subVectors(pp[b], pp[a]);
+    const vec = (out, a, b) => out.subVectors(pp[b], pp[a]);
     // hips
-    const qHips = basis(dir(P.pelvis, P.spine), side(P.Lhip, P.Rhip));
-    const qSpine = basis(dir(P.spine, P.chest), side(P.Lsh, P.Rsh).add(side(P.Lhip, P.Rhip)));
-    const qChest = basis(dir(P.chest, P.neck), side(P.Lsh, P.Rsh));
-    const qNeck = basis(dir(P.neck, P.head), side(P.Lsh, P.Rsh));
+    const qHips = basis(vec(_ba, P.pelvis, P.spine), vec(_bb, P.Rhip, P.Lhip));
+    const qSpine = basis(vec(_ba, P.spine, P.chest), vec(_bb, P.Rsh, P.Lsh).add(vec(_bc, P.Rhip, P.Lhip)));
+    const qChest = basis(vec(_ba, P.chest, P.neck), vec(_bb, P.Rsh, P.Lsh));
+    const qNeck = basis(vec(_ba, P.neck, P.head), vec(_bb, P.Rsh, P.Lsh));
     const setLocal = (bi, qWorld, qParent) => { bones[bi].quaternion.copy(qParent).invert().multiply(qWorld); };
     const hips = bones[BI.hips];
     hips.position.copy(pp[P.pelvis]);
@@ -259,21 +261,22 @@ export class Ragdoll {
     // limbs: swing-only from parent frames
     const J = body.t.J;
     const limb = (bi, parentQ, jointName, childName, pa, pb) => {
-      const rest = tv.set(J[childName][0] - J[jointName][0], J[childName][1] - J[jointName][1], J[childName][2] - J[jointName][2]).normalize();
+      const cj = J[childName], jj = J[jointName];
+      const rest = tv.set(cj[0] - jj[0], cj[1] - jj[1], cj[2] - jj[2]).normalize();
       const cur = tv2.subVectors(pp[pb], pp[pa]).normalize().applyQuaternion(tq2.copy(parentQ).invert());
-      const q = new THREE.Quaternion().setFromUnitVectors(rest, cur);
+      const q = tq.setFromUnitVectors(rest, cur);
       bones[bi].quaternion.copy(q);
-      return parentQ.clone().multiply(q);
+      return nq().copy(parentQ).multiply(q);
     };
-    for (const s of ['L', 'R']) {
-      const S = s + '_';
-      bones[BI[S + 'clav']].quaternion.identity();
-      const qU = limb(BI[S + 'upper'], qChest, S + 'upper', S + 'fore', P[s + 'sh'], P[s + 'el']);
-      const qF = limb(BI[S + 'fore'], qU, S + 'fore', S + 'hand', P[s + 'el'], P[s + 'wr']);
-      limb(BI[S + 'hand'], qF, S + 'hand', S + 'tip', P[s + 'wr'], P[s + 'tip']);
-      const qT = limb(BI[S + 'thigh'], qHips, S + 'thigh', S + 'shin', P[s + 'hip'], P[s + 'kn']);
-      const qS = limb(BI[S + 'shin'], qT, S + 'shin', S + 'foot', P[s + 'kn'], P[s + 'an']);
-      limb(BI[S + 'foot'], qS, S + 'foot', S + 'toe', P[s + 'an'], P[s + 'toe']);
+    for (let k = 0; k < 2; k++) {
+      const L = LIMBS[k];
+      bones[L.clav].quaternion.identity();
+      const qU = limb(L.upper, qChest, L.n.upper, L.n.fore, L.sh, L.el);
+      const qF = limb(L.fore, qU, L.n.fore, L.n.hand, L.el, L.wr);
+      limb(L.hand, qF, L.n.hand, L.n.tip, L.wr, L.tip);
+      const qT = limb(L.thigh, qHips, L.n.thigh, L.n.shin, L.hip, L.kn);
+      const qS = limb(L.shin, qT, L.n.shin, L.n.foot, L.kn, L.an);
+      limb(L.foot, qS, L.n.foot, L.n.toe, L.an, L.toe);
     }
     body.root.updateMatrixWorld(true);
   }
@@ -283,4 +286,18 @@ export class Ragdoll {
 }
 const _X = new THREE.Vector3(1, 0, 0);
 const _BB = new THREE.Vector3(2.4, 2.4, 2.4);
+const _ba = new THREE.Vector3(), _bb = new THREE.Vector3(), _bc = new THREE.Vector3(), _bz = new THREE.Vector3();
+const _QP = Array.from({ length: 24 }, () => new THREE.Quaternion());
+// per-side bone/particle index tables (resolved once instead of string-building every frame)
+const LIMBS = ['L', 'R'].map(s => {
+  const S = s + '_', n = {};
+  for (const k of ['upper', 'fore', 'hand', 'tip', 'thigh', 'shin', 'foot', 'toe']) n[k] = S + k;
+  return {
+    n, clav: BI[S + 'clav'], upper: BI[S + 'upper'], fore: BI[S + 'fore'], hand: BI[S + 'hand'],
+    thigh: BI[S + 'thigh'], shin: BI[S + 'shin'], foot: BI[S + 'foot'],
+    sh: P[s + 'sh'], el: P[s + 'el'], wr: P[s + 'wr'], tip: P[s + 'tip'], hip: P[s + 'hip'], kn: P[s + 'kn'], an: P[s + 'an'], toe: P[s + 'toe'],
+  };
+});
+const LEGS = [[P.Lhip, P.Lkn, P.Lan, P.Ltoe], [P.Rhip, P.Rkn, P.Ran, P.Rtoe]];
+const ARMS = [[P.Lsh, P.Lel, P.Lwr], [P.Rsh, P.Rel, P.Rwr]];
 export const RAG_P = P;

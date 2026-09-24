@@ -14,13 +14,14 @@ export class Builder {
   constructor(world) {
     this.world = world;
     this.batches = new Map();
+    this.openings = [];     // wall openings, harvested as portals (portals.js)
     this.aoFloorY = [];   // not used directly; occlusion is computed per vertex from height
   }
 
   batch(mat, zone = '') {
     const key = zone ? mat.uuid + '|' + zone : mat;
     let b = this.batches.get(key);
-    if (!b) { b = new Batch(mat); this.batches.set(key, b); }
+    if (!b) { b = new Batch(mat); b.zone = zone; this.batches.set(key, b); }
     return b;
   }
 
@@ -28,10 +29,13 @@ export class Builder {
   // uvs derived from world coordinates projected on the quad's dominant plane.
   quad(mat, p0, p1, p2, p3, n, opts = {}) {
     let zone = '';
-    if (this.zoneFn) {
+    if (opts.zone) zone = opts.zone;
+    else if (this.zoneFn) {
       const cx = (p0.x + p2.x) / 2, cz = (p0.z + p2.z) / 2;
       const size = Math.max(Math.abs(p0.x - p2.x), Math.abs(p0.z - p2.z), Math.abs(p1.x - p3.x), Math.abs(p1.z - p3.z));
-      zone = size > 40 ? 'big' : this.zoneFn(cx + n.x * 0.2, cz + n.z * 0.2);
+      // the zone the face looks into; faces straddling two zones (door jambs, lintels, wall tops) are
+      // seen from both and go to the always-drawn layer
+      zone = size > 40 ? 'big' : faceZone(this.zoneFn, [p0, p1, p2, p3], n);
     }
     const b = this.batch(mat, zone);
     const tile = opts.tile ?? mat.userData.tile ?? 2;
@@ -102,6 +106,7 @@ export class Builder {
   // Wall running along X at centre z (thickness t) from x0..x1, heights y0..y1, with openings
   // [{a, b, y0, y1}] in x. matN faces -z, matP faces +z.
   wallX(z, x0, x1, { t = 0.2, y0 = 0, y1 = 3, openings = [], matN, matP, matTop, interiorN = true, interiorP = true, surf } = {}) {
+    for (const o of openings) this.openings.push({ axis: 'x', at: z, a: o.a, b: o.b, y0: o.y0 ?? y0, y1: o.y1 ?? 2.1 });
     const segs = splitOpenings(x0, x1, y0, y1, openings);
     for (const s of segs) {
       const mats = { nz: matN, pz: matP, px: matTop || matN || matP, nx: matTop || matN || matP, py: matTop || matN || matP, ny: matTop || matN || matP };
@@ -114,6 +119,7 @@ export class Builder {
   }
 
   wallZ(x, z0, z1, { t = 0.2, y0 = 0, y1 = 3, openings = [], matN, matP, matTop, interiorN = true, interiorP = true, surf } = {}) {
+    for (const o of openings) this.openings.push({ axis: 'z', at: x, a: o.a, b: o.b, y0: o.y0 ?? y0, y1: o.y1 ?? 2.1 });
     const segs = splitOpenings(z0, z1, y0, y1, openings);
     for (const s of segs) {
       const mats = { nx: matN, px: matP, pz: matTop || matN || matP, nz: matTop || matN || matP, py: matTop || matN || matP, ny: matTop || matN || matP };
@@ -153,6 +159,7 @@ export class Builder {
       const mesh = new THREE.Mesh(g, mat);
       mesh.receiveShadow = true;
       mesh.castShadow = !mat.transparent;
+      mesh.userData.zone = b.zone || '';
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();
       parent.add(mesh);
@@ -229,6 +236,43 @@ export function mergeGeos(list) {
 // ---------------------------------------------------------------------------------------------
 // Merge static meshes under `root` into one mesh per (material, zone, shadow flags) bucket.
 // Objects (or ancestors) with userData.dynamic are left untouched.
+// Zone a face looks into: its footprint (pushed 0.2 m along the normal) is sampled on a 1 m lattice,
+// plus 0.4 m either side of its centre across the face (catches narrow door jambs and lintels). Any
+// disagreement means the face straddles zones (long walls running past several rooms, jambs, wall
+// tops) -> 'open', the always-drawn layer.
+function faceZone(zoneFn, pts, n) {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+  const ox = n.x * 0.2, oz = n.z * 0.2, cx = (x0 + x1) / 2 + ox, cz = (z0 + z1) / 2 + oz;
+  const zc = zoneFn(cx, cz);
+  const nx = Math.max(1, Math.ceil(x1 - x0)), nz = Math.max(1, Math.ceil(z1 - z0));
+  for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
+    const x = x0 + 0.05 + (x1 - x0 - 0.1) * i / nx + ox, z = z0 + 0.05 + (z1 - z0 - 0.1) * j / nz + oz;
+    if (zoneFn(x, z) !== zc) return 'open';
+  }
+  const t = Math.abs(n.y) > 0.5 ? [[0.4, 0], [-0.4, 0], [0, 0.4], [0, -0.4]] : [[-n.z * 0.4, n.x * 0.4], [n.z * 0.4, -n.x * 0.4]];
+  for (const [dx, dz] of t) if (zoneFn(cx + dx, cz + dz) !== zc) return 'open';
+  return zc;
+}
+// Zone of an object from its bounding sphere: 'open' when its footprint touches more than one zone.
+export function areaZone(zoneFn, x, z, r) {
+  const z0 = zoneFn(x, z), d = Math.min(r, 0.6);
+  for (const [dx, dz] of [[d, 0], [-d, 0], [0, d], [0, -d]]) if (zoneFn(x + dx, z + dz) !== z0) return 'open';
+  return z0;
+}
+
+// Materials that render identically share a bucket even when they are separate objects (props build
+// their own materials per instance). Materials animated at runtime (userData.live) keep their identity.
+const _tid = (t) => t ? t.uuid : '-';
+function matSignature(m) {
+  if (m.userData.live || m.isShaderMaterial || !m.isMeshStandardMaterial) return m.uuid;
+  const c = (x) => x ? x.getHexString() : '-';
+  return [m.type, c(m.color), c(m.emissive), m.emissiveIntensity, m.roughness, m.metalness, m.envMapIntensity,
+    _tid(m.map), _tid(m.normalMap), _tid(m.roughnessMap), _tid(m.metalnessMap), _tid(m.aoMap), _tid(m.emissiveMap), _tid(m.alphaMap), _tid(m.envMap),
+    m.normalMap ? m.normalScale.x + ',' + m.normalScale.y : '', m.transparent, m.opacity, m.side, m.vertexColors, m.alphaTest, m.flatShading,
+    m.depthWrite, m.polygonOffset, m.polygonOffsetFactor, m.userData.patchOpts ? JSON.stringify(m.userData.patchOpts) : '', Object.prototype.hasOwnProperty.call(m, 'onBeforeCompile') && !m.userData.patchOpts ? m.uuid : ''].join('|');
+}
+
 export function mergeStatic(root, zoneFn) {
   const buckets = new Map();
   const remove = [];
@@ -242,10 +286,10 @@ export function mergeStatic(root, zoneFn) {
     if (!g.attributes.position || !g.attributes.normal) return;
     if (!g.boundingSphere) g.computeBoundingSphere();
     sphere.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
-    const zone = sphere.radius > 12 ? 'big' : zoneFn(sphere.center.x, sphere.center.z);
-    const key = o.material.uuid + '|' + zone + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + (o.renderOrder || 0);
+    const zone = o.userData.zone ?? (sphere.radius > 12 ? 'big' : areaZone(zoneFn, sphere.center.x, sphere.center.z, sphere.radius));
+    const key = matSignature(o.material) + '|' + zone + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + (o.renderOrder || 0);
     let b = buckets.get(key);
-    if (!b) { b = { mat: o.material, cast: o.castShadow, recv: o.receiveShadow, order: o.renderOrder || 0, items: [] }; buckets.set(key, b); }
+    if (!b) { b = { mat: o.material, zone, cast: o.castShadow, recv: o.receiveShadow, order: o.renderOrder || 0, items: [] }; buckets.set(key, b); }
     b.items.push(o);
     remove.push(o);
   });
@@ -292,6 +336,7 @@ export function mergeStatic(root, zoneFn) {
     g.computeBoundingSphere(); g.computeBoundingBox();
     const m = new THREE.Mesh(g, b.mat);
     m.castShadow = b.cast; m.receiveShadow = b.recv; m.renderOrder = b.order;
+    m.userData.zone = b.zone;
     m.matrixAutoUpdate = false;
     root.add(m);
     for (const o of b.items) o.parent && o.parent.remove(o);
