@@ -20,10 +20,23 @@ export class VoiceSystem {
     this.bytes = new Map();   // file -> Promise<ArrayBuffer>
     this.chain = Promise.resolve();
     this.gen = 0;             // bumped by cancel()
-    fetch('assets/voice/manifest.json')
-      .then(r => (r.ok ? r.json() : null))
-      .then(m => { if (m) for (const l of Object.values(m.lines)) { this.clips.set(l.text, l); this.clipBytes(l); } })
-      .catch(() => { /* no voice pack */ });
+    this.readyDone = false;
+    // Load behind a readiness gate. Without one, a line that fires before the
+    // manifest resolves finds no clip and silently falls back to robot voice —
+    // which is exactly what INT-01 does 0.8 s after the camera beep on a cold load.
+    this.ready = fetch('assets/voice/manifest.json')
+      .then(r => { if (!r.ok) throw new Error('manifest HTTP ' + r.status); return r.json(); })
+      .then(m => {
+        const entries = Object.values(m.lines || {});
+        for (const l of entries) this.clips.set(l.text, l);
+        return this.prefetch(entries, 6);   // cap concurrency: 33 at once fight the models and HDRIs
+      })
+      .then(() => this.clips.size)
+      .catch(e => {
+        // visible, not swallowed: a failed pack must not look like an absent one
+        console.warn('[voice] recorded pack unavailable, falling back to speech synthesis —', e && e.message);
+        return 0;
+      });
     const load = () => { try { this.voices = this.synth ? this.synth.getVoices() : []; } catch (e) { this.voices = []; } };
     if (this.synth) { load(); try { this.synth.addEventListener('voiceschanged', load); } catch (e) { /* old API */ } }
   }
@@ -50,8 +63,27 @@ export class VoiceSystem {
 
   // Say a line now; resolves when finished (or after an estimated duration).
   say(kind, text, opts = {}) {
+    if (!this.readyDone) {
+      // Decide clip-vs-synth only once the manifest has settled, otherwise the
+      // first line of every scene is spoken by the robot. Bounded, so a dead
+      // network cannot stall the story.
+      return Promise.race([this.ready, new Promise(r => setTimeout(r, 2500))])
+        .then(() => { this.readyDone = true; return this.say(kind, text, opts); });
+    }
     const clip = !opts.silent && this.settings.get('voice') && this.audio && this.audio.ready && this.clips.get(text);
     return clip ? this.sayClip(kind, text, clip, opts) : this.saySynth(kind, text, opts);
+  }
+
+  // Fetch clip bytes a few at a time. A clip that fails simply falls back per line.
+  prefetch(entries, limit) {
+    let i = 0;
+    const worker = async () => {
+      while (i < entries.length) {
+        const l = entries[i++];
+        try { await this.clipBytes(l); } catch (e) { /* that line falls back to synthesis */ }
+      }
+    };
+    return Promise.all(Array.from({ length: Math.min(limit, entries.length) }, worker));
   }
 
   clipBytes(l) {
@@ -69,16 +101,27 @@ export class VoiceSystem {
   }
 
   async playClip(kind, text, clip, opts, gen) {
-    const sp = SPEAKERS[kind] || SPEAKERS.officer, A = this.audio, c = A.ctx;
-    let buf;
-    // decodeAudioData detaches its input: decode a copy, keep the bytes for a replay (checkpoint restart)
-    try { buf = await c.decodeAudioData((await this.clipBytes(clip)).slice(0)); } catch (e) { return this.saySynth(kind, text, opts); }
+    const sp = SPEAKERS[kind] || SPEAKERS.officer, A = this.audio;
+    // ctx must be read inside the try. Dereferenced before it, a missing context
+    // throws a TypeError that bypasses this fallback and kills the line outright.
+    let buf, c;
+    try {
+      c = A && A.ctx;
+      if (!c) throw new Error('audio context not ready');
+      // decodeAudioData detaches its input: decode a copy, keep the bytes for a replay (checkpoint restart)
+      buf = await c.decodeAudioData((await this.clipBytes(clip)).slice(0));
+    } catch (e) {
+      return this.saySynth(kind, text, opts);
+    }
     if (gen !== this.gen) return;                                   // cancelled while decoding
     const radio = sp.radio && !clip.radioBaked;
     this.ui && this.ui.subtitle(opts.label || sp.label, text, sp.radio, buf.duration + 0.6);
     if (radio) {
       A.play('radioIn', { bus: 'voice', vol: 0.6, norand: true });
-      this._static = A.play('breath0', { bus: 'voice', vol: 0.12, loop: true, rate: 3.5, norand: true });
+      // radioStatic is the recorded bed (assets/sfx); breath0 at rate 3.5 is the
+      // synthesised stand-in it replaces. Keep both so the pack is optional.
+      const bed = (A.buffers && A.buffers.radioStatic) ? 'radioStatic' : 'breath0';
+      this._static = A.play(bed, { bus: 'voice', vol: 0.12, loop: true, rate: bed === 'breath0' ? 3.5 : 1, norand: true });
     }
     const src = c.createBufferSource(); src.buffer = buf;
     const g = c.createGain(); g.gain.value = opts.vol ?? 1;
@@ -103,7 +146,8 @@ export class VoiceSystem {
       const finish = () => { if (done) return; done = true; if (sp.radio && this.audio) { this.audio.play('radioOut', { bus: 'voice', vol: 0.5, norand: true }); this.audio.stop(this._static, 0.05); } setTimeout(resolve, 150); };
       if (sp.radio && this.audio && this.audio.ready) {
         this.audio.play('radioIn', { bus: 'voice', vol: 0.6, norand: true });
-        this._static = this.audio.play('breath0', { bus: 'voice', vol: 0.12, loop: true, rate: 3.5, norand: true });
+        const bed = (this.audio.buffers && this.audio.buffers.radioStatic) ? 'radioStatic' : 'breath0';
+        this._static = this.audio.play(bed, { bus: 'voice', vol: 0.12, loop: true, rate: bed === 'breath0' ? 3.5 : 1, norand: true });
       }
       const useTTS = this.synth && this.settings.get('voice') && this.voices.length && !opts.silent;
       const fallback = setTimeout(finish, (est + (useTTS ? 3.5 : 0)) * 1000 * (opts.timeScale || 1));

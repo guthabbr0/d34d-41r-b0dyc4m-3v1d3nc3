@@ -169,7 +169,8 @@ export class Story {
     const g = this.game, L = g.level, S = L.spawns, T = g.templates;
     // emitters: fire alarm in the lobby, TV static in 1C
     this.emitters.push(g.audio && g.audio.emitter('fireAlarm', V3(4.6, 2.3, -2.2), 0.55, { ref: 3, rolloff: 1.2 }));
-    this.emitters.push(g.audio && g.audio.emitter('breath0', V3(1.2, 0.9, -11.4), 0.2, { ref: 1.2, rolloff: 2 }));
+    const tvBuf = (g.audio && g.audio.buffers && g.audio.buffers.tvStatic) ? 'tvStatic' : 'breath0';
+    this.emitters.push(g.audio && g.audio.emitter(tvBuf, V3(1.2, 0.9, -11.4), 0.2, { ref: 1.2, rolloff: 2 }));
     this.setDressing();
     // bodies that are always there
     g.spawnCorpse(L.markers.lobbyCorpse, 1.2, T[3 % T.length], { keep: true, wounds: 4, pool: 1.4 });
@@ -317,7 +318,8 @@ export class Story {
     ui.showOverlay(true, false);
     this.app.muteWorld(false);
     this.siren = A && A.play('siren', { vol: 0.25, loop: true, norand: true, bus: 'amb' });
-    this.engine = A && A.play('breath1', { vol: 0.25, loop: true, rate: 0.35, norand: true, bus: 'amb' });
+    const idleBuf = (A && A.buffers && A.buffers.carIdle) ? 'carIdle' : 'breath1';
+    this.engine = A && A.play(idleBuf, { vol: 0.25, loop: true, rate: idleBuf === 'carIdle' ? 1 : 0.35, norand: true, bus: 'amb' });
     await this.wait(0.8);
     await this.say('dispatch', 'Twenty-one Adam fourteen, Keston. Respond code three, twenty-two fifty Wexley Avenue, Harlan Court Apartments, unit one-C.');
     await this.say('dispatch', 'Multiple callers reporting screaming and an assault in progress. Caller advises the suspect is biting the victim.');

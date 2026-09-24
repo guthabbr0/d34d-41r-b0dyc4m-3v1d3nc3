@@ -372,7 +372,31 @@ export class AudioEngine {
     // ambience loops
     this.rainBuf = this._rainBuffer();
     this.humBuf = this._humBuffer();
+    await this._loadSfxPack();
     this.ready = true;
+  }
+
+  // Replace synthesised effects with assets/sfx/*.mp3 (docs/voice/sfx.json).
+  // Anything missing or undecodable keeps its synthesised buffer, so the game
+  // degrades instead of breaking. 'rain' replaces rainBuf, not a bank entry.
+  async _loadSfxPack() {
+    const c = this.ctx;
+    if (!c) return;
+    let man;
+    try {
+      const r = await fetch('assets/sfx/manifest.json');
+      if (!r.ok) return;
+      man = await r.json();
+    } catch (e) { return; }
+    await Promise.all(Object.entries(man).map(async ([name, file]) => {
+      try {
+        const res = await fetch('assets/sfx/' + file);
+        if (!res.ok) return;
+        const buf = await c.decodeAudioData((await res.arrayBuffer()).slice(0));
+        if (name === 'rain') this.rainBuf = buf;
+        else this.buffers[name] = buf;
+      } catch (e) { /* keep the synthesised buffer */ }
+    }));
   }
 
   _rainBuffer() {
