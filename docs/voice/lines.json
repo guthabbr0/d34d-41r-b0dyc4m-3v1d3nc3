@@ -1,0 +1,1007 @@
+{
+  "version": 2,
+  "game": "DEAD AIR",
+  "source": "src/game/story.js",
+  "fields": {
+    "game_text": "Exact string the game passes to VoiceSystem.say(). The key that maps a clip to its line. Do not change it here without changing story.js.",
+    "tts_text": "What to synthesise: the same words plus ElevenLabs v3 delivery tags in [square brackets]. Voice only, no sound effects.",
+    "bake_tags": "Sounds that MAY be baked into the clip (radio lines only). If baked, set radioBaked: true in the manifest so the engine skips its own squelch and static.",
+    "tts_text_full": "bake_tags + tts_text: the prompt for a clip that carries its own radio squelch and static.",
+    "engine_sfx": "Sounds the game engine already plays during and right after the line. Context for the performance only. NEVER bake them, they would play twice.",
+    "script_text": "The whole moment in brackets (engine sounds + delivery + words), for reading, casting and table reads; not a TTS prompt.",
+    "channel": "radio = heard through a police radio; body-mic = the wearer, closest voice; distant-outdoor = shouted from 4 to 7 m in the rain.",
+    "max_seconds": "Hard cap on clip length where the timing of the scene depends on it (null = no cap).",
+    "est_seconds": "Duration the game currently assumes for the subtitle; a real clip replaces it with its own length."
+  },
+  "cast": {
+    "dispatch": {
+      "character": "DISPATCH",
+      "subtitle": "DISPATCH",
+      "channel": "radio",
+      "brief": "Keston City PD night dispatcher. Woman, mid-40s, American (Midwest), warm alto. Practised, flat radio cadence, clipped and efficient. The calm only cracks at the very end."
+    },
+    "officer": {
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "brief": "Patrol officer, man, late 30s, American, baritone. Dry, understated, tired from a night shift. Under pressure becomes breathless and raw; after the bite progressively weaker and slurred. He wears the camera, so he is the closest voice in every scene."
+    },
+    "swat": {
+      "character": "SWAT ONE (team leader)",
+      "subtitle": "SWAT",
+      "channel": "distant-outdoor",
+      "brief": "Man, 40s, big chest voice, commanding. Shouting across 4 to 7 m of rainy courtyard. Also voices END-10 over his radio."
+    },
+    "swat2": {
+      "character": "SWAT TWO",
+      "subtitle": "SWAT",
+      "channel": "distant-outdoor",
+      "brief": "Man, late 20s, higher tenor, tense, on the edge of panic."
+    },
+    "radio": {
+      "character": "SWAT ONE (on radio)",
+      "subtitle": "RADIO",
+      "channel": "radio",
+      "brief": "Same actor as SWAT ONE, heard through a police radio."
+    }
+  },
+  "scenes": [
+    {
+      "id": "INT",
+      "title": "Intro: the drive (evidence playback)",
+      "context": "Inside patrol car 21-A-14, 03:13 a.m., heavy rain, wipers, lights and siren (code 3). The bodycam's 30 s pre-event buffer ends with a double beep and audio cuts in. Radio traffic plays while the car waits at a red light, then turns into the Harlan Court lot."
+    },
+    {
+      "id": "LOB",
+      "title": "Lobby",
+      "context": "Halloran enters the dark apartment-block lobby through a glass door. Fluorescent tubes buzz and flicker."
+    },
+    {
+      "id": "1C",
+      "title": "Apartment 1C: the bite",
+      "context": "A figure crouches over the building superintendent, feeding. Halloran confronts it at gunpoint; it lunges and bites his left forearm during a struggle. After the fight the victim gets back up."
+    },
+    {
+      "id": "CP1",
+      "title": "Checkpoint 1 restart",
+      "context": "Only heard when the player restarts from checkpoint 1 (after the bite): a one-line reminder of the objective."
+    },
+    {
+      "id": "MNT",
+      "title": "Maintenance room",
+      "context": "A shotgun lies on the workbench."
+    },
+    {
+      "id": "CRT",
+      "title": "Courtyard finale: hold until SWAT arrives",
+      "context": "Rear courtyard in the rain, waves of infected pouring in, continuous gunfire. Dispatch counts down on the radio (lines fire at 0, 40, 70 and 95 s)."
+    },
+    {
+      "id": "END",
+      "title": "Ending: the gate",
+      "context": "SWAT van in the alley, siren and red/blue lights. Two SWAT officers with rifle lights hold the gate. The infection takes Halloran mid-conversation; SWAT fires; the camera falls to the ground and records the aftermath."
+    }
+  ],
+  "lines": [
+    {
+      "id": "INT-01",
+      "scene": "INT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:322",
+      "trigger": "intro, 0.8 s after the camera beep",
+      "blocking": true,
+      "game_text": "Twenty-one Adam fourteen, Keston. Respond code three, twenty-two fifty Wexley Avenue, Harlan Court Apartments, unit one-C.",
+      "tts_text": "[calm, clipped radio cadence] Twenty-one Adam fourteen, Keston. [urgent] Respond code three, twenty-two fifty Wexley Avenue, Harlan Court Apartments, unit one-C.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [calm, clipped radio cadence] Twenty-one Adam fourteen, Keston. [urgent] Respond code three, twenty-two fifty Wexley Avenue, Harlan Court Apartments, unit one-C.",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain on the car roof",
+          "wipers",
+          "engine idling"
+        ],
+        "after": []
+      },
+      "script_text": "[siren] [rain on the car roof] [wipers] [engine idling] [radio squelch] [static] [calm, clipped radio cadence] Twenty-one Adam fourteen, Keston. [urgent] Respond code three, twenty-two fifty Wexley Avenue, Harlan Court Apartments, unit one-C.",
+      "direction": "First voice the player hears after the silent buffer. Routine but urgent.",
+      "pronunciation": "call sign 21-A-14 = \"twenty-one Adam fourteen\"; 2250 = \"twenty-two fifty\"; code three = lights and siren; \"unit one-C\" (apartment 1C)",
+      "max_seconds": null,
+      "est_seconds": 5.6
+    },
+    {
+      "id": "INT-02",
+      "scene": "INT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:323",
+      "trigger": "intro, after INT-01",
+      "blocking": true,
+      "game_text": "Multiple callers reporting screaming and an assault in progress. Caller advises the suspect is biting the victim.",
+      "tts_text": "Multiple callers reporting screaming and an assault in progress. [slight hesitation] Caller advises the suspect is biting the victim.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] Multiple callers reporting screaming and an assault in progress. [slight hesitation] Caller advises the suspect is biting the victim.",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain on the car roof",
+          "wipers"
+        ],
+        "after": []
+      },
+      "script_text": "[siren] [rain on the car roof] [wipers] [radio squelch] [static] Multiple callers reporting screaming and an assault in progress. [slight hesitation] Caller advises the suspect is biting the victim.",
+      "direction": "She reads it straight, but the last clause is strange even to her.",
+      "max_seconds": null,
+      "est_seconds": 5.9
+    },
+    {
+      "id": "INT-03",
+      "scene": "INT",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:326",
+      "trigger": "intro, after INT-02",
+      "blocking": true,
+      "game_text": "Adam fourteen copies. I'm about a minute out.",
+      "tts_text": "[tired, steady, raising his voice over the siren] Adam fourteen copies. I'm about a minute out.",
+      "bake_tags": [],
+      "tts_text_full": "[tired, steady, raising his voice over the siren] Adam fourteen copies. I'm about a minute out.",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain on the car roof",
+          "wipers"
+        ],
+        "after": []
+      },
+      "script_text": "[siren] [rain on the car roof] [wipers] [tired, steady, raising his voice over the siren] Adam fourteen copies. I'm about a minute out.",
+      "direction": "Keys the shoulder mic while glancing at the laptop. Night-shift weary.",
+      "max_seconds": null,
+      "est_seconds": 3.1
+    },
+    {
+      "id": "INT-04",
+      "scene": "INT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:328",
+      "trigger": "intro, after INT-03",
+      "blocking": true,
+      "game_text": "Fourteen, be advised, we're holding six similar calls across the east district. Your backup is delayed.",
+      "tts_text": "Fourteen, be advised, [lower, heavier] we're holding six similar calls across the east district. [flat] Your backup is delayed.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] Fourteen, be advised, [lower, heavier] we're holding six similar calls across the east district. [flat] Your backup is delayed.",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain on the car roof",
+          "wipers"
+        ],
+        "after": []
+      },
+      "script_text": "[siren] [rain on the car roof] [wipers] [radio squelch] [static] Fourteen, be advised, [lower, heavier] we're holding six similar calls across the east district. [flat] Your backup is delayed.",
+      "direction": "First hint that the night is wrong. Controlled, a touch slower.",
+      "max_seconds": null,
+      "est_seconds": 5.6
+    },
+    {
+      "id": "INT-05",
+      "scene": "INT",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:329",
+      "trigger": "intro, after INT-04; the red light turns green right after",
+      "blocking": true,
+      "game_text": "...Copy.",
+      "tts_text": "[long exhale] ...Copy.",
+      "bake_tags": [],
+      "tts_text_full": "[long exhale] ...Copy.",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain on the car roof"
+        ],
+        "after": [
+          "car pulls away"
+        ]
+      },
+      "script_text": "[siren] [rain on the car roof] [long exhale] ...Copy. [car pulls away]",
+      "direction": "Resigned. One word after a breath.",
+      "max_seconds": 2.0,
+      "est_seconds": 1.6
+    },
+    {
+      "id": "INT-06",
+      "scene": "INT",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:340",
+      "trigger": "intro, car stopped in the lot",
+      "blocking": true,
+      "game_text": "Adam fourteen, on scene.",
+      "tts_text": "[quiet, keying the shoulder mic] Adam fourteen, on scene.",
+      "bake_tags": [],
+      "tts_text_full": "[quiet, keying the shoulder mic] Adam fourteen, on scene.",
+      "engine_sfx": {
+        "during": [
+          "rain on the car roof",
+          "engine idling"
+        ],
+        "after": []
+      },
+      "script_text": "[rain on the car roof] [engine idling] [quiet, keying the shoulder mic] Adam fourteen, on scene.",
+      "direction": "Low, focused, looking at the dark building.",
+      "max_seconds": null,
+      "est_seconds": 1.7
+    },
+    {
+      "id": "INT-07",
+      "scene": "INT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:341",
+      "trigger": "intro, after INT-06",
+      "blocking": true,
+      "game_text": "Copy fourteen, on scene at zero three fourteen.",
+      "tts_text": "[flat, procedural] Copy fourteen, on scene at zero three fourteen.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [flat, procedural] Copy fourteen, on scene at zero three fourteen.",
+      "engine_sfx": {
+        "during": [
+          "rain on the car roof",
+          "engine idling"
+        ],
+        "after": []
+      },
+      "script_text": "[rain on the car roof] [engine idling] [radio squelch] [static] [flat, procedural] Copy fourteen, on scene at zero three fourteen.",
+      "direction": "Logging the time. Neutral.",
+      "pronunciation": "03:14 = \"zero three fourteen\"",
+      "max_seconds": null,
+      "est_seconds": 2.9
+    },
+    {
+      "id": "LOB-01",
+      "scene": "LOB",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:428",
+      "trigger": "player enters the lobby (trigger 'enterLobby', checkpoint 0)",
+      "blocking": false,
+      "game_text": "Police department! Anybody hurt in here? Call out!",
+      "tts_text": "[shouting into an empty lobby] Police department! [calling out] Anybody hurt in here? Call out!",
+      "bake_tags": [],
+      "tts_text_full": "[shouting into an empty lobby] Police department! [calling out] Anybody hurt in here? Call out!",
+      "engine_sfx": {
+        "during": [
+          "fluorescent tubes buzzing",
+          "rain outside"
+        ],
+        "after": []
+      },
+      "script_text": "[fluorescent tubes buzzing] [rain outside] [shouting into an empty lobby] Police department! [calling out] Anybody hurt in here? Call out!",
+      "direction": "Projecting into a dark building, clearing it by the book.",
+      "max_seconds": null,
+      "est_seconds": 3.1
+    },
+    {
+      "id": "1C-01",
+      "scene": "1C",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:490",
+      "trigger": "entering 1C (trigger 'reach1C' or 'in1C'), camera push-in",
+      "blocking": true,
+      "game_text": "Police! Get away from him!",
+      "tts_text": "[shouting, commanding, gun raised] Police! Get away from him!",
+      "bake_tags": [],
+      "tts_text_full": "[shouting, commanding, gun raised] Police! Get away from him!",
+      "engine_sfx": {
+        "during": [
+          "wet feeding sounds",
+          "TV static"
+        ],
+        "after": []
+      },
+      "script_text": "[wet feeding sounds] [TV static] [shouting, commanding, gun raised] Police! Get away from him!",
+      "direction": "Full command voice, but it is his first sight of this.",
+      "max_seconds": null,
+      "est_seconds": 2.0
+    },
+    {
+      "id": "1C-02",
+      "scene": "1C",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:494",
+      "trigger": "1C cutscene, after 1C-01",
+      "blocking": true,
+      "game_text": "Show me your hands! Now!",
+      "tts_text": "[shouting, voice cracking with fear] Show me your hands! [louder] Now!",
+      "bake_tags": [],
+      "tts_text_full": "[shouting, voice cracking with fear] Show me your hands! [louder] Now!",
+      "engine_sfx": {
+        "during": [
+          "TV static"
+        ],
+        "after": [
+          "the figure rises and lunges"
+        ]
+      },
+      "script_text": "[TV static] [shouting, voice cracking with fear] Show me your hands! [louder] Now! [the figure rises and lunges]",
+      "direction": "The procedure is not working and he knows it.",
+      "max_seconds": null,
+      "est_seconds": 2.0
+    },
+    {
+      "id": "1C-03",
+      "scene": "1C",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:530",
+      "trigger": "1.5 s into the grab, when the bite lands",
+      "blocking": false,
+      "game_text": "Agh! It bit me! Get off!",
+      "tts_text": "[screaming in pain] Agh! It bit me! [panicked, struggling] Get off!",
+      "bake_tags": [],
+      "tts_text_full": "[screaming in pain] Agh! It bit me! [panicked, struggling] Get off!",
+      "engine_sfx": {
+        "during": [
+          "bite",
+          "struggle",
+          "flesh tearing"
+        ],
+        "after": []
+      },
+      "script_text": "[bite] [struggle] [flesh tearing] [screaming in pain] Agh! It bit me! [panicked, struggling] Get off!",
+      "direction": "Raw pain and panic, mid-struggle. Short.",
+      "max_seconds": 2.5,
+      "est_seconds": 2.4
+    },
+    {
+      "id": "1C-04",
+      "scene": "1C",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:546",
+      "trigger": "1.6 s after the attacker dies",
+      "blocking": true,
+      "game_text": "Dispatch, Adam fourteen. Shots fired, suspect down. Victim is... he's not breathing.",
+      "tts_text": "[breathing heavily, shaken, into the radio] Dispatch, Adam fourteen. Shots fired, suspect down. [pause] Victim is... [quiet] he's not breathing.",
+      "bake_tags": [],
+      "tts_text_full": "[breathing heavily, shaken, into the radio] Dispatch, Adam fourteen. Shots fired, suspect down. [pause] Victim is... [quiet] he's not breathing.",
+      "engine_sfx": {
+        "during": [
+          "TV static"
+        ],
+        "after": []
+      },
+      "script_text": "[TV static] [breathing heavily, shaken, into the radio] Dispatch, Adam fourteen. Shots fired, suspect down. [pause] Victim is... [quiet] he's not breathing.",
+      "direction": "Adrenaline crash. Trying to sound procedural and failing on the last words.",
+      "max_seconds": null,
+      "est_seconds": 4.5
+    },
+    {
+      "id": "1C-05",
+      "scene": "1C",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:554",
+      "trigger": "1C, while the victim twitches",
+      "blocking": true,
+      "game_text": "Fourteen, say again? Are you injured?",
+      "tts_text": "Fourteen, say again? [concerned] Are you injured?",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] Fourteen, say again? [concerned] Are you injured?",
+      "engine_sfx": {
+        "during": [
+          "TV static"
+        ],
+        "after": []
+      },
+      "script_text": "[TV static] [radio squelch] [static] Fourteen, say again? [concerned] Are you injured?",
+      "direction": "The first crack in her calm: concern for her officer.",
+      "max_seconds": null,
+      "est_seconds": 2.2
+    },
+    {
+      "id": "1C-06",
+      "scene": "1C",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:579",
+      "trigger": "1.2 s after the risen victim dies",
+      "blocking": true,
+      "game_text": "Dispatch... fourteen. I've been bitten. The victim got back up. They don't stop. Send everything you've got.",
+      "tts_text": "[breathless, trying to hold it together] Dispatch... fourteen. [shaky] I've been bitten. The victim got back up. [voice breaking] They don't stop. [desperate] Send everything you've got.",
+      "bake_tags": [],
+      "tts_text_full": "[breathless, trying to hold it together] Dispatch... fourteen. [shaky] I've been bitten. The victim got back up. [voice breaking] They don't stop. [desperate] Send everything you've got.",
+      "engine_sfx": {
+        "during": [
+          "TV static"
+        ],
+        "after": []
+      },
+      "script_text": "[TV static] [breathless, trying to hold it together] Dispatch... fourteen. [shaky] I've been bitten. The victim got back up. [voice breaking] They don't stop. [desperate] Send everything you've got.",
+      "direction": "After killing the risen victim. The moment he understands.",
+      "max_seconds": null,
+      "est_seconds": 6.2
+    },
+    {
+      "id": "1C-07",
+      "scene": "1C",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:580",
+      "trigger": "after 1C-06",
+      "blocking": true,
+      "game_text": "Copy fourteen. SWAT is staging on Pell Street. Can you get to the rear courtyard? They'll come in through the alley.",
+      "tts_text": "[urgent, controlled] Copy fourteen. SWAT is staging on Pell Street. Can you get to the rear courtyard? They'll come in through the alley.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [urgent, controlled] Copy fourteen. SWAT is staging on Pell Street. Can you get to the rear courtyard? They'll come in through the alley.",
+      "engine_sfx": {
+        "during": [],
+        "after": []
+      },
+      "script_text": "[radio squelch] [static] [urgent, controlled] Copy fourteen. SWAT is staging on Pell Street. Can you get to the rear courtyard? They'll come in through the alley.",
+      "direction": "Back to procedure, faster. She is holding it together for him.",
+      "pronunciation": "Pell Street, rhymes with \"bell\"",
+      "max_seconds": null,
+      "est_seconds": 7.2
+    },
+    {
+      "id": "1C-08",
+      "scene": "1C",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:581",
+      "trigger": "after 1C-07",
+      "blocking": true,
+      "game_text": "Rear courtyard. Copy.",
+      "tts_text": "[heavy breathing] Rear courtyard. Copy.",
+      "bake_tags": [],
+      "tts_text_full": "[heavy breathing] Rear courtyard. Copy.",
+      "engine_sfx": {
+        "during": [],
+        "after": []
+      },
+      "script_text": "[heavy breathing] Rear courtyard. Copy.",
+      "direction": "Short, determined.",
+      "max_seconds": null,
+      "est_seconds": 1.6
+    },
+    {
+      "id": "CP1-01",
+      "scene": "CP1",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:624",
+      "trigger": "restart from checkpoint 1 only",
+      "blocking": false,
+      "game_text": "Maintenance door, east end. Move.",
+      "tts_text": "[breathless, urgent, to himself] Maintenance door, east end. Move.",
+      "bake_tags": [],
+      "tts_text_full": "[breathless, urgent, to himself] Maintenance door, east end. Move.",
+      "engine_sfx": {
+        "during": [
+          "heartbeat",
+          "distant infected moans"
+        ],
+        "after": []
+      },
+      "script_text": "[heartbeat] [distant infected moans] [breathless, urgent, to himself] Maintenance door, east end. Move.",
+      "direction": "Self-instruction after the bite. Clipped.",
+      "max_seconds": null,
+      "est_seconds": 2.0
+    },
+    {
+      "id": "MNT-01",
+      "scene": "MNT",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:458",
+      "trigger": "player enters the maintenance room (trigger 'maintEnter')",
+      "blocking": false,
+      "game_text": "That's a shotgun on the bench.",
+      "tts_text": "[muttering, a flicker of relief] That's a shotgun on the bench.",
+      "bake_tags": [],
+      "tts_text_full": "[muttering, a flicker of relief] That's a shotgun on the bench.",
+      "engine_sfx": {
+        "during": [
+          "electrical hum",
+          "heartbeat"
+        ],
+        "after": []
+      },
+      "script_text": "[electrical hum] [heartbeat] [muttering, a flicker of relief] That's a shotgun on the bench.",
+      "direction": "Half to himself. The first good news of the night.",
+      "max_seconds": null,
+      "est_seconds": 2.4
+    },
+    {
+      "id": "CRT-01",
+      "scene": "CRT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:651",
+      "trigger": "courtyard reached, finale timer 0 s",
+      "blocking": false,
+      "game_text": "Fourteen, SWAT is two minutes out. Hold the courtyard. They're coming through the alley.",
+      "tts_text": "[urgent, raising her voice over gunfire on the channel] Fourteen, SWAT is two minutes out. Hold the courtyard. They're coming through the alley.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [urgent, raising her voice over gunfire on the channel] Fourteen, SWAT is two minutes out. Hold the courtyard. They're coming through the alley.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "gunfire",
+          "infected screaming"
+        ],
+        "after": []
+      },
+      "script_text": "[rain] [gunfire] [infected screaming] [radio squelch] [static] [urgent, raising her voice over gunfire on the channel] Fourteen, SWAT is two minutes out. Hold the courtyard. They're coming through the alley.",
+      "direction": "Clear and firm over chaos.",
+      "max_seconds": null,
+      "est_seconds": 4.9
+    },
+    {
+      "id": "CRT-02",
+      "scene": "CRT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:658",
+      "trigger": "finale timer 40 s",
+      "blocking": false,
+      "game_text": "Sixty seconds, fourteen. Hang on.",
+      "tts_text": "[tense, encouraging] Sixty seconds, fourteen. Hang on.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [tense, encouraging] Sixty seconds, fourteen. Hang on.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "gunfire",
+          "infected screaming"
+        ],
+        "after": []
+      },
+      "script_text": "[rain] [gunfire] [infected screaming] [radio squelch] [static] [tense, encouraging] Sixty seconds, fourteen. Hang on.",
+      "direction": "Personal for the first time: she is rooting for him.",
+      "max_seconds": null,
+      "est_seconds": 1.9
+    },
+    {
+      "id": "CRT-03",
+      "scene": "CRT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:658",
+      "trigger": "finale timer 70 s",
+      "blocking": false,
+      "game_text": "Thirty seconds. Units are on Pell.",
+      "tts_text": "[urgent] Thirty seconds. Units are on Pell.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [urgent] Thirty seconds. Units are on Pell.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "gunfire",
+          "infected screaming"
+        ],
+        "after": []
+      },
+      "script_text": "[rain] [gunfire] [infected screaming] [radio squelch] [static] [urgent] Thirty seconds. Units are on Pell.",
+      "direction": "",
+      "pronunciation": "Pell = street name, rhymes with \"bell\"",
+      "max_seconds": null,
+      "est_seconds": 2.2
+    },
+    {
+      "id": "CRT-04",
+      "scene": "CRT",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:658",
+      "trigger": "finale timer 95 s",
+      "blocking": false,
+      "game_text": "SWAT is entering the alley. Do not fire toward the gate.",
+      "tts_text": "[firm warning] SWAT is entering the alley. [emphatic] Do not fire toward the gate.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [firm warning] SWAT is entering the alley. [emphatic] Do not fire toward the gate.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "gunfire",
+          "infected screaming"
+        ],
+        "after": []
+      },
+      "script_text": "[rain] [gunfire] [infected screaming] [radio squelch] [static] [firm warning] SWAT is entering the alley. [emphatic] Do not fire toward the gate.",
+      "direction": "A warning that matters. Slow down on the last clause.",
+      "max_seconds": null,
+      "est_seconds": 3.9
+    },
+    {
+      "id": "END-01",
+      "scene": "END",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:725",
+      "trigger": "after SWAT has shot the remaining infected in the courtyard",
+      "blocking": false,
+      "game_text": "Fourteen, SWAT has the rear gate. Walk to them, keep your hands where they can see them.",
+      "tts_text": "[careful, measured] Fourteen, SWAT has the rear gate. Walk to them, [slower] keep your hands where they can see them.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [careful, measured] Fourteen, SWAT has the rear gate. Walk to them, [slower] keep your hands where they can see them.",
+      "engine_sfx": {
+        "during": [
+          "siren in the alley",
+          "rain"
+        ],
+        "after": []
+      },
+      "script_text": "[siren in the alley] [rain] [radio squelch] [static] [careful, measured] Fourteen, SWAT has the rear gate. Walk to them, [slower] keep your hands where they can see them.",
+      "direction": "She knows he has been bitten. Deliberately gentle.",
+      "max_seconds": null,
+      "est_seconds": 5.9
+    },
+    {
+      "id": "END-02",
+      "scene": "END",
+      "speaker": "swat",
+      "character": "SWAT ONE (team leader)",
+      "subtitle_label": "SWAT",
+      "channel": "distant-outdoor",
+      "source": "src/game/story.js:752",
+      "trigger": "player within 7.5 m of the gate",
+      "blocking": true,
+      "game_text": "Keston SWAT! Drop the weapon! Drop it now!",
+      "tts_text": "[shouting from a distance, commanding] Keston SWAT! Drop the weapon! [louder] Drop it now!",
+      "bake_tags": [],
+      "tts_text_full": "[shouting from a distance, commanding] Keston SWAT! Drop the weapon! [louder] Drop it now!",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain"
+        ],
+        "after": []
+      },
+      "script_text": "[siren] [rain] [shouting from a distance, commanding] Keston SWAT! Drop the weapon! [louder] Drop it now!",
+      "direction": "Rifle light in the officer's face. Standard challenge, maximum volume.",
+      "max_seconds": null,
+      "est_seconds": 2.7
+    },
+    {
+      "id": "END-03",
+      "scene": "END",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:754",
+      "trigger": "after END-02",
+      "blocking": true,
+      "game_text": "I'm a police officer! Twenty-one Adam fourteen!",
+      "tts_text": "[shouting back, desperate] I'm a police officer! Twenty-one Adam fourteen!",
+      "bake_tags": [],
+      "tts_text_full": "[shouting back, desperate] I'm a police officer! Twenty-one Adam fourteen!",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain"
+        ],
+        "after": []
+      },
+      "script_text": "[siren] [rain] [shouting back, desperate] I'm a police officer! Twenty-one Adam fourteen!",
+      "direction": "Lowering the gun. Pleading to be recognised.",
+      "pronunciation": "\"twenty-one Adam fourteen\"",
+      "max_seconds": null,
+      "est_seconds": 2.7
+    },
+    {
+      "id": "END-04",
+      "scene": "END",
+      "speaker": "swat2",
+      "character": "SWAT TWO",
+      "subtitle_label": "SWAT",
+      "channel": "distant-outdoor",
+      "source": "src/game/story.js:755",
+      "trigger": "after END-03; the officer looks down at his bitten arm",
+      "blocking": true,
+      "game_text": "Show me your arm. Your left arm. Show me, now!",
+      "tts_text": "[shouting, tense] Show me your arm. [sharper] Your left arm. [louder] Show me, now!",
+      "bake_tags": [],
+      "tts_text_full": "[shouting, tense] Show me your arm. [sharper] Your left arm. [louder] Show me, now!",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain"
+        ],
+        "after": []
+      },
+      "script_text": "[siren] [rain] [shouting, tense] Show me your arm. [sharper] Your left arm. [louder] Show me, now!",
+      "direction": "He has seen the blood.",
+      "max_seconds": null,
+      "est_seconds": 3.2
+    },
+    {
+      "id": "END-05",
+      "scene": "END",
+      "speaker": "officer",
+      "character": "OFC. R. HALLORAN #4471",
+      "subtitle_label": "OFC. HALLORAN",
+      "channel": "body-mic",
+      "source": "src/game/story.js:768",
+      "trigger": "after the arm reveal",
+      "blocking": true,
+      "game_text": "It's... it's nothing. I'm fine.",
+      "tts_text": "[weak, slurred, unconvincing] It's... it's nothing. [forced] I'm fine.",
+      "bake_tags": [],
+      "tts_text_full": "[weak, slurred, unconvincing] It's... it's nothing. [forced] I'm fine.",
+      "engine_sfx": {
+        "during": [
+          "heartbeat",
+          "siren",
+          "rain"
+        ],
+        "after": []
+      },
+      "script_text": "[heartbeat] [siren] [rain] [weak, slurred, unconvincing] It's... it's nothing. [forced] I'm fine.",
+      "direction": "The infection is taking him. Lying, and failing.",
+      "max_seconds": null,
+      "est_seconds": 2.0
+    },
+    {
+      "id": "END-06",
+      "scene": "END",
+      "speaker": "swat",
+      "character": "SWAT ONE (team leader)",
+      "subtitle_label": "SWAT",
+      "channel": "distant-outdoor",
+      "source": "src/game/story.js:769",
+      "trigger": "after END-05",
+      "blocking": true,
+      "game_text": "He's bit! He's bit! Get on the ground! On the ground!",
+      "tts_text": "[screaming, alarmed] He's bit! He's bit! [commanding] Get on the ground! On the ground!",
+      "bake_tags": [],
+      "tts_text_full": "[screaming, alarmed] He's bit! He's bit! [commanding] Get on the ground! On the ground!",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain"
+        ],
+        "after": [
+          "heartbeat",
+          "infected moan",
+          "radio glitch"
+        ]
+      },
+      "script_text": "[siren] [rain] [screaming, alarmed] He's bit! He's bit! [commanding] Get on the ground! On the ground! [heartbeat] [infected moan] [radio glitch]",
+      "direction": "Alarm spreading through the team.",
+      "max_seconds": null,
+      "est_seconds": 3.6
+    },
+    {
+      "id": "END-07",
+      "scene": "END",
+      "speaker": "swat2",
+      "character": "SWAT TWO",
+      "subtitle_label": "SWAT",
+      "channel": "distant-outdoor",
+      "source": "src/game/story.js:778",
+      "trigger": "the turn: the camera lurches toward the gate",
+      "blocking": true,
+      "game_text": "Stop! STOP!",
+      "tts_text": "[screaming] Stop! STOP!",
+      "bake_tags": [],
+      "tts_text_full": "[screaming] Stop! STOP!",
+      "engine_sfx": {
+        "during": [
+          "siren",
+          "rain"
+        ],
+        "after": [
+          "shots",
+          "shots",
+          "shots",
+          "camera hits the ground",
+          "silence"
+        ]
+      },
+      "script_text": "[siren] [rain] [screaming] Stop! STOP! [shots] [shots] [shots] [camera hits the ground] [silence]",
+      "direction": "The officer lurches forward. Pure reflex. Keep it short: the shots follow at once.",
+      "max_seconds": 1.2,
+      "est_seconds": 1.6
+    },
+    {
+      "id": "END-08",
+      "scene": "END",
+      "speaker": "swat",
+      "character": "SWAT ONE (team leader)",
+      "subtitle_label": "SWAT",
+      "channel": "distant-outdoor",
+      "source": "src/game/story.js:813",
+      "trigger": "1.2 s after the camera hits the ground",
+      "blocking": true,
+      "game_text": "Shots fired, shots fired. Suspect down.",
+      "tts_text": "[breathing hard, procedural, shaken] Shots fired, shots fired. Suspect down.",
+      "bake_tags": [],
+      "tts_text_full": "[breathing hard, procedural, shaken] Shots fired, shots fired. Suspect down.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "siren"
+        ],
+        "after": []
+      },
+      "script_text": "[rain] [siren] [breathing hard, procedural, shaken] Shots fired, shots fired. Suspect down.",
+      "direction": "Training takes over. Recorded from the ground: he stands over the camera.",
+      "max_seconds": null,
+      "est_seconds": 2.1
+    },
+    {
+      "id": "END-09",
+      "scene": "END",
+      "speaker": "swat2",
+      "character": "SWAT TWO",
+      "subtitle_label": "SWAT",
+      "channel": "distant-outdoor",
+      "source": "src/game/story.js:814",
+      "trigger": "after END-08",
+      "blocking": true,
+      "game_text": "Wait... that's fourteen. That's one of ours.",
+      "tts_text": "[quiet, horrified] Wait... that's fourteen. [whispering] That's one of ours.",
+      "bake_tags": [],
+      "tts_text_full": "[quiet, horrified] Wait... that's fourteen. [whispering] That's one of ours.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "siren"
+        ],
+        "after": []
+      },
+      "script_text": "[rain] [siren] [quiet, horrified] Wait... that's fourteen. [whispering] That's one of ours.",
+      "direction": "Realisation. Barely audible on the last sentence.",
+      "max_seconds": null,
+      "est_seconds": 2.4
+    },
+    {
+      "id": "END-10",
+      "scene": "END",
+      "speaker": "radio",
+      "character": "SWAT ONE (on radio)",
+      "subtitle_label": "RADIO",
+      "channel": "radio",
+      "source": "src/game/story.js:815",
+      "trigger": "after END-09",
+      "blocking": true,
+      "game_text": "Dispatch, SWAT one. We need a supervisor and a coroner at twenty-two fifty Wexley, rear alley.",
+      "tts_text": "[flat, numb, procedural] Dispatch, SWAT one. We need a supervisor and a coroner at twenty-two fifty Wexley, rear alley.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [flat, numb, procedural] Dispatch, SWAT one. We need a supervisor and a coroner at twenty-two fifty Wexley, rear alley.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "siren"
+        ],
+        "after": []
+      },
+      "script_text": "[rain] [siren] [radio squelch] [static] [flat, numb, procedural] Dispatch, SWAT one. We need a supervisor and a coroner at twenty-two fifty Wexley, rear alley.",
+      "direction": "Holding his voice level by force.",
+      "pronunciation": "\"twenty-two fifty Wexley\"",
+      "max_seconds": null,
+      "est_seconds": 5.5
+    },
+    {
+      "id": "END-11",
+      "scene": "END",
+      "speaker": "dispatch",
+      "character": "DISPATCH",
+      "subtitle_label": "DISPATCH",
+      "channel": "radio",
+      "source": "src/game/story.js:816",
+      "trigger": "after END-10; the recording glitches out 1.2 s later",
+      "blocking": true,
+      "game_text": "...Copy, SWAT one.",
+      "tts_text": "[long pause] [voice breaking] ...Copy, SWAT one.",
+      "bake_tags": [
+        "radio squelch",
+        "static"
+      ],
+      "tts_text_full": "[radio squelch] [static] [long pause] [voice breaking] ...Copy, SWAT one.",
+      "engine_sfx": {
+        "during": [
+          "rain",
+          "siren"
+        ],
+        "after": [
+          "signal lost"
+        ]
+      },
+      "script_text": "[rain] [siren] [radio squelch] [static] [long pause] [voice breaking] ...Copy, SWAT one. [signal lost]",
+      "direction": "The last line of the game. She knew Halloran.",
+      "max_seconds": null,
+      "est_seconds": 1.6
+    }
+  ]
+}

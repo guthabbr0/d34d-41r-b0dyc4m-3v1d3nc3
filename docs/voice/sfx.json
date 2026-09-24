@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "about": "Optional: sound effects the game synthesises today that are worth replacing with recorded or ElevenLabs Sound Effects audio. The radio group carries every radio line; the rest is ambience. Every entry is a drop-in: same name, same role. See HANDOFF.md section 5 for how a file replaces a synthesised sound.",
+  "sounds": [
+    {
+      "name": "radioIn",
+      "target": "audio.buffers.radioIn",
+      "seconds": 0.3,
+      "loop": false,
+      "channels": 1,
+      "used_by": "src/engine/voice.js: start of every radio line (volume 0.6), skipped when the clip has radioBaked: true",
+      "prompt": "Police two-way radio key-up: a short squelch burst with a tiny chirp as the channel opens, band-limited, dry, mono, 0.3 seconds",
+      "notes": "Must start on the transient: no silence at the head."
+    },
+    {
+      "name": "radioOut",
+      "target": "audio.buffers.radioOut",
+      "seconds": 0.3,
+      "loop": false,
+      "channels": 1,
+      "used_by": "src/engine/voice.js: end of every radio line (volume 0.5). ALSO src/main.js glitch(): the camera signal-loss glitch plays it pitched down (rate 0.5 to 0.9)",
+      "prompt": "Police radio squelch tail when the transmit key is released: a short hiss burst cut off abruptly, band-limited, dry, mono, 0.3 seconds",
+      "notes": "Also doubles as the camera glitch sound, so keep it noisy rather than tonal."
+    },
+    {
+      "name": "radioStatic",
+      "target": "audio.buffers.radioStatic (new name)",
+      "seconds": 4,
+      "loop": true,
+      "channels": 1,
+      "used_by": "src/engine/voice.js: static bed under every radio line (volume 0.12). Today it is faked with the breath0 buffer played at rate 3.5, which is why the new name is needed: see HANDOFF.md section 5",
+      "prompt": "Low steady police radio static: soft hiss with faint crackle and a little digital warble, no voices, no tones, seamless loop, 4 seconds",
+      "notes": "Seamless loop, constant level."
+    },
+    {
+      "name": "tvStatic",
+      "target": "audio.buffers.tvStatic (new name)",
+      "seconds": 4,
+      "loop": true,
+      "channels": 1,
+      "used_by": "src/game/story.js:172, the snowy TV in apartment 1C (positional emitter, volume 0.2). Today it is breath0 again",
+      "prompt": "Old CRT television tuned to a dead channel: white-noise snow with a faint 15 kHz whine, seamless loop, 4 seconds",
+      "notes": "Seamless loop."
+    },
+    {
+      "name": "carIdle",
+      "target": "audio.buffers.carIdle (new name)",
+      "seconds": 4,
+      "loop": true,
+      "channels": 1,
+      "used_by": "src/game/story.js:320, the patrol car engine during the intro drive (ambience bus, volume 0.25). Today it is breath1 at rate 0.35",
+      "prompt": "Interior of a police sedan at idle and low speed: low V8 engine rumble, heater fan, no music, no voices, seamless loop, 4 seconds",
+      "notes": "Seamless loop."
+    },
+    {
+      "name": "beep",
+      "target": "audio.buffers.beep",
+      "seconds": 0.45,
+      "loop": false,
+      "channels": 1,
+      "used_by": "src/game/story.js:316, body camera switching to record after its 30 s silent pre-event buffer",
+      "prompt": "Body-worn camera starts recording: two short electronic beeps at about 1 kHz, 0.28 seconds apart, dry, mono",
+      "notes": ""
+    },
+    {
+      "name": "siren",
+      "target": "audio.buffers.siren",
+      "seconds": 8,
+      "loop": true,
+      "channels": 1,
+      "used_by": "src/game/story.js:319 (on the patrol car roof, ambience bus, volume 0.25) and :691 (on the SWAT van in the ending, 3-D positioned, volume 1.2)",
+      "prompt": "American police car siren, classic wail cycle, heard from close by outdoors, no engine, no voices, seamless loop, 8 seconds",
+      "notes": "Seamless loop. The synthesised one fades in and out inside its 9 s buffer, so it pulses when looped; a real loop fixes that."
+    },
+    {
+      "name": "fireAlarm",
+      "target": "audio.buffers.fireAlarm",
+      "seconds": 4,
+      "loop": true,
+      "channels": 1,
+      "used_by": "src/game/story.js:171, fire alarm horn in the lobby (positional emitter, volume 0.55)",
+      "prompt": "Building fire alarm horn, temporal-3 pattern (three half-second blasts, then a pause), indoor, seamless loop, 4 seconds",
+      "notes": "Seamless loop."
+    },
+    {
+      "name": "rain",
+      "target": "audio.rainBuf (set before startAmbience)",
+      "seconds": 6,
+      "loop": true,
+      "channels": 2,
+      "used_by": "src/engine/audio.js startAmbience(): the rain bed everywhere; the engine low-passes it indoors",
+      "prompt": "Steady heavy night rain on pavement and puddles in a city courtyard, no thunder, no traffic, stereo, seamless loop, 6 seconds",
+      "notes": "Stereo, seamless loop."
+    }
+  ],
+  "other_bank_names": "Everything else the engine synthesises can be replaced the same way, by name (numbered names are random variants, keep the count): pistol0-2, shotgun0-1, dry, click, magOut, magIn, slide, pumpBack, pumpFwd, shellIn, holster, hull, magDrop, impactGlass, door, doorMetal, locked, pickup, medkit, hitPlayer, grab, bite, shove, shoveWhoosh, heart, thunder, brass0-3, flesh0-3, impactConcrete0-3, impactMetal0-3, impactWood0-3, footConcrete0-3, footWood0-3, footWet0-3, footTile0-3, struggle0-2, feed0-2, breath0-1, zmoan0-7, zscream0-3, zattack0-3, zdeath0-2."
+}

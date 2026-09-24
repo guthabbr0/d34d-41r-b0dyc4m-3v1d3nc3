@@ -12,6 +12,8 @@
     "icons": "node tools/make_favicon.mjs",
     "perf:gate": "node perf/gate.mjs perf/run-3/report.json --phases heavy",
     "perf:pvs": "node perf/pvs_check.mjs",
+    "voice:check": "node tools/voice_script.mjs --check",
+    "voice:script": "node tools/voice_script.mjs",
     "preview": "npm run build && npm run serve"
   },
   "devDependencies": {
