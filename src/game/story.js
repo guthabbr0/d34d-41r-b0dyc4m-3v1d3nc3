@@ -169,11 +169,45 @@ export class Story {
     // emitters: fire alarm in the lobby, TV static in 1C
     this.emitters.push(g.audio && g.audio.emitter('fireAlarm', V3(4.6, 2.3, -2.2), 0.55, { ref: 3, rolloff: 1.2 }));
     this.emitters.push(g.audio && g.audio.emitter('breath0', V3(1.2, 0.9, -11.4), 0.2, { ref: 1.2, rolloff: 2 }));
+    this.setDressing();
     // bodies that are always there
     g.spawnCorpse(L.markers.lobbyCorpse, 1.2, T[3 % T.length], { keep: true, wounds: 4, pool: 1.4 });
     if (point === 'intro' || point === 'cp0') {
       g.spawnCorpse(S.lotCorpse, 2.4, T[4 % T.length], { keep: true, wounds: 4, pool: 1.3 });
     }
+  }
+
+  // Blood trail, drag marks, handprints and debris that tell what happened before the officer arrived.
+  setDressing() {
+    const g = this.game, L = g.level, fx = g.fx;
+    const up = V3(0, 1, 0);
+    const trail = L.markers.bloodTrail;
+    for (let i = 0; i < trail.length - 1; i++) {
+      const a = trail[i], b = trail[i + 1];
+      const d = b.clone().sub(a); const len = d.length();
+      const rot = Math.atan2(d.x, -d.z) + Math.PI;
+      for (let t = 0; t < len; t += 0.55) {
+        const p = a.clone().addScaledVector(d, t / len).add(V3((Math.random() - 0.5) * 0.12, 0.004, (Math.random() - 0.5) * 0.12));
+        fx.bloodDecal(p, up, 10 + (Math.random() * 2 | 0), 0.45 + Math.random() * 0.2, rot + (Math.random() - 0.5) * 0.3);
+        if (Math.random() < 0.35) fx.bloodDecal(p.clone().add(V3((Math.random() - 0.5) * 0.4, 0, (Math.random() - 0.5) * 0.4)), up, 4 + (Math.random() * 4 | 0), 0.06 + Math.random() * 0.08);
+      }
+    }
+    // handprints and smears beside the 1C door, spatter in the lot
+    const wallN = V3(0, 0, 1);
+    for (const [x, y] of [[0.35, 1.25], [0.2, 0.95], [1.75, 1.4]]) fx.bloodDecal(V3(x, y, -10.32), wallN, 4 + (Math.random() * 4 | 0), 0.22, Math.random() * 6);
+    fx.bloodDecal(V3(0.3, 1.1, -10.32), wallN, 8, 0.5, Math.PI);
+    fx.bloodDecal(V3(-4.93, 1.2, -4.4), V3(1, 0, 0), 9, 0.6, Math.PI);
+    fx.bloodDecal(V3(-12.6, 0.005, 5.7), up, 14, 1.3, 0.4);
+    for (let i = 0; i < 8; i++) fx.bloodDecal(V3(-12.6 + (Math.random() - 0.5) * 2.5, 0.005, 5.7 + (Math.random() - 0.5) * 2.5), up, 4 + (Math.random() * 4 | 0), 0.1 + Math.random() * 0.2);
+    fx.bloodDecal(V3(-14.18, 1.0, 8.2), V3(1, 0, 0), 5, 0.5, 0);
+    // bloody footprints leading out of 1C
+    for (let i = 0; i < 7; i++) fx.bloodDecal(V3(1.0 + (i % 2) * 0.18, 0.004, -10.8 + i * 0.62), up, 12, 0.13, Math.PI);
+    // shattered entrance glass
+    for (let i = 0; i < 26; i++) fx.bloodDecal(V3(0.65 + (Math.random() - 0.5) * 1.6, 0.004, 0.3 + (Math.random() - 0.5) * 1.4), up, 15, 0.05 + Math.random() * 0.12, Math.random() * 6);
+    // 1C: spatter around the victim
+    for (let i = 0; i < 10; i++) fx.bloodDecal(V3(0.4 + (Math.random() - 0.5) * 2, 0.008, -13 + (Math.random() - 0.5) * 2), up, 4 + (Math.random() * 4 | 0), 0.12 + Math.random() * 0.25);
+    fx.bloodDecal(V3(-0.2, 1.3, -15.42), wallN, 6, 0.8, 0);
+    fx.bloodDecal(V3(-0.2, 1.2, -15.42), wallN, 9, 0.7, Math.PI);
   }
 
   stopEmitters() { for (const e of this.emitters) this.audio && this.audio.stop(e, 0.2); this.emitters.length = 0; }
@@ -808,10 +842,13 @@ export class Story {
     if (spd > 0.1) poseShamble(pose, s.phase, { reach: 0, limp: 0, stride: 0.5, lean: 0.15 });
     else poseIdle(pose, t, { seed: 3, headTilt: 0 });
     // rifle aimed: both arms forward
+    // rifle shouldered: arms forward-down, forearms folded in toward the chest-mounted rifle
     for (const [sgn, P] of [[1, 'L_'], [-1, 'R_']]) {
-      pose.set(BI[P + 'upper'], -1.25, -0.6 * sgn, 0.15 * sgn);
-      pose.set(BI[P + 'fore'], -0.9, 0, 0);
+      pose.set(BI[P + 'upper'], -0.85, -0.55 * sgn, -0.12 * sgn);
+      pose.set(BI[P + 'fore'], -1.05, 0.2 * sgn, 0);
+      pose.set(BI[P + 'hand'], -0.2, 0, 0);
     }
+    pose.addB(BI.chest, 0.08, 0, 0);
     pose.set(BI.head, 0.05, 0, 0); pose.set(BI.jaw, 0);
     applyPose(s.body, pose);
     s.body.root.position.copy(s.pos);

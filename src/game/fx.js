@@ -73,7 +73,7 @@ function decalAtlas() {
   for (let i = 4; i < 8; i++) {
     const [x, y] = at(i);
     const cx = x + S / 2, cy = y + S / 2;
-    const col = () => `rgba(${90 + rnd() * 40 | 0},${4 + rnd() * 8 | 0},${3 + rnd() * 6 | 0},${0.75 + rnd() * 0.25})`;
+    const col = () => `rgba(${48 + rnd() * 28 | 0},${4 + rnd() * 6 | 0},${3 + rnd() * 4 | 0},${0.8 + rnd() * 0.2})`;
     g.fillStyle = col(); g.beginPath(); g.arc(cx, cy, 34 + rnd() * 20, 0, 7); g.fill();
     for (let k = 0; k < 60; k++) {
       const a = rnd() * 6.28, r = 20 + rnd() ** 0.7 * 100, sz = (1 - r / 130) * 14 * rnd() + 1.5;
@@ -83,20 +83,20 @@ function decalAtlas() {
   // 8-9 drips (vertical runs from a splat)
   for (let i = 8; i < 10; i++) {
     const [x, y] = at(i);
-    g.fillStyle = 'rgba(100,6,4,0.95)'; g.beginPath(); g.arc(x + S / 2, y + 50, 40, 0, 7); g.fill();
+    g.fillStyle = 'rgba(58,5,3,0.95)'; g.beginPath(); g.arc(x + S / 2, y + 50, 40, 0, 7); g.fill();
     for (let k = 0; k < 7; k++) { const dx = x + S / 2 + (rnd() - 0.5) * 70, L = 60 + rnd() * 150, w = 3 + rnd() * 7; g.fillRect(dx - w / 2, y + 50, w, L); g.beginPath(); g.arc(dx, y + 50 + L, w * 0.8, 0, 7); g.fill(); }
   }
   // 10-11 smears / trails
   for (let i = 10; i < 12; i++) {
     const [x, y] = at(i);
-    for (let k = 0; k < 30; k++) { g.fillStyle = `rgba(${70 + rnd() * 30 | 0},5,4,${0.2 + rnd() * 0.4})`; g.fillRect(x + 20 + rnd() * 20, y + 10 + k * 7, S - 60 - rnd() * 40, 6 + rnd() * 8); }
+    for (let k = 0; k < 30; k++) { g.fillStyle = `rgba(${40 + rnd() * 20 | 0},4,3,${0.3 + rnd() * 0.45})`; g.fillRect(x + 20 + rnd() * 20, y + 10 + k * 7, S - 60 - rnd() * 40, 6 + rnd() * 8); }
   }
   // 12 bloody footprint
-  { const [x, y] = at(12); g.fillStyle = 'rgba(80,6,4,0.8)'; g.beginPath(); g.ellipse(x + 128, y + 90, 40, 62, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(x + 128, y + 190, 32, 40, 0, 0, 7); g.fill(); }
+  { const [x, y] = at(12); g.fillStyle = 'rgba(48,5,3,0.8)'; g.beginPath(); g.ellipse(x + 128, y + 90, 40, 62, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(x + 128, y + 190, 32, 40, 0, 0, 7); g.fill(); }
   // 13 scorch / soot
   { const [x, y] = at(13); const gr = g.createRadialGradient(x + 128, y + 128, 0, x + 128, y + 128, 110); gr.addColorStop(0, 'rgba(0,0,0,0.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x, y, S, S); }
   // 14 blood pool
-  { const [x, y] = at(14); g.fillStyle = 'rgba(70,4,3,1)'; g.beginPath(); for (let k = 0; k < 24; k++) { const a = k / 24 * 6.28, r = 90 + rnd() * 30; g.lineTo(x + 128 + Math.cos(a) * r, y + 128 + Math.sin(a) * r); } g.fill(); }
+  { const [x, y] = at(14); g.fillStyle = 'rgba(42,3,2,1)'; g.beginPath(); for (let k = 0; k < 24; k++) { const a = k / 24 * 6.28, r = 90 + rnd() * 30; g.lineTo(x + 128 + Math.cos(a) * r, y + 128 + Math.sin(a) * r); } g.fill(); }
   // 15 glass crack
   { const [x, y] = at(15); g.strokeStyle = 'rgba(230,240,255,0.8)'; g.lineWidth = 2; for (let k = 0; k < 12; k++) { const a = rnd() * 6.28; g.beginPath(); g.moveTo(x + 128, y + 128); g.lineTo(x + 128 + Math.cos(a) * 120, y + 128 + Math.sin(a) * 120); g.stroke(); } for (let r = 20; r < 110; r += 30) { g.beginPath(); g.arc(x + 128, y + 128, r, 0, 7); g.stroke(); } }
   const t = new THREE.CanvasTexture(c);
@@ -561,6 +561,21 @@ export class FX {
       }
     }
     this._updateLensDrops(dt, cam, outdoor);
+    this._updateMotes(dt, cam, outdoor);
+  }
+
+  // Dust motes hanging in the air; the particle shader only lights them inside the flashlight cone.
+  _updateMotes(dt, cam, outdoor) {
+    if (outdoor) return;
+    this.moteT = (this.moteT || 0) + dt * 70;
+    const fwd = this._v.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    while (this.moteT > 1) {
+      this.moteT -= 1;
+      const d = 0.6 + Math.random() * 4.5;
+      const p = cam.position.clone().addScaledVector(fwd, d).add(new THREE.Vector3((Math.random() - 0.5) * d * 1.2, (Math.random() - 0.5) * d * 0.9, (Math.random() - 0.5) * d * 1.2));
+      if (p.y < 0.1 || p.y > 2.9) continue;
+      this.alpha.spawn(P({ pos: p, vel: new THREE.Vector3((Math.random() - 0.5) * 0.04, (Math.random() - 0.4) * 0.03, (Math.random() - 0.5) * 0.04), life: 4 + Math.random() * 4, size0: 0.004 + Math.random() * 0.006, size1: 0.004 + Math.random() * 0.006, tile: TILE.DROP, alpha: 0.5, r: 0.9, g: 0.9, b: 0.85, fadeIn: 0.25, fadeOut: 0.7, rotVel: 0 }));
+    }
   }
 
   _updateShells(dt, list, mesh, kind) {

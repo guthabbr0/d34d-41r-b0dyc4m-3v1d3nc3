@@ -379,7 +379,7 @@ class App {
     pp.heart = pulse;
     if (this.glitchT > 0) { this.glitchT -= dt; pp.glitch = this.glitchAmp * Math.min(1, this.glitchT / Math.max(0.05, this.glitchDur) * 2) * (0.6 + Math.random() * 0.4); }
     else pp.glitch = p.infection > 0.5 && Math.random() < 0.01 ? p.infection * 0.3 : 0;
-    pp.key = 0.06; pp.minLog = -3.0; pp.maxLog = 4;
+    pp.key = 0.048; pp.minLog = -2.7; pp.maxLog = 4;
     // camera optics
     const cam = p.camera;
     cam.fov = s.fov;
