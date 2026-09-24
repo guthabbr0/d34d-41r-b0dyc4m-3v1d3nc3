@@ -50,6 +50,14 @@ query inside the SVG); `npm run icons` re-renders `favicon.ico` (16/32/48 px) an
 Debug URL parameters: `?q=low|medium|high|ultra` forces a preset, `?start=intro|cp0|cp1|cp2` jumps
 to a checkpoint, `?auto=1` skips the click-to-start gate.
 
+## Voice-over
+
+Every spoken line lives in [`docs/voice/lines.json`](docs/voice/lines.json) (exact game text,
+ElevenLabs-style `[tags]`, cast, timing); [`docs/voice/SCRIPT.md`](docs/voice/SCRIPT.md) is the
+readable script and [`docs/voice/HANDOFF.md`](docs/voice/HANDOFF.md) the contract for replacing
+speech synthesis with recorded clips. `npm run voice:check` fails when the script and the game
+drift apart; `npm run voice:script` regenerates `SCRIPT.md`.
+
 ## Deploy (Vercel)
 
 The repository is set up for Vercel's Git integration; pushing is all it takes.
@@ -72,8 +80,9 @@ src/engine   renderer + bodycam post chain, assets, audio synthesis, input, sett
 src/game     level builder, portal culling, materials, props, player, weapons, zombies, ragdolls, fx, story
 src/ui       menus, HUD, settings panel
 assets/      Poly Haven textures, models and HDRIs (CC0), already simplified for the web
-tools/       build, asset fetch/simplify, headless screenshot harness
+tools/       build, asset fetch/simplify, headless screenshot harness, voice script checker
 perf/        performance scenario, budget, gate and report — see perf/README.md
+docs/voice/  voice-over script, line data and integration guide for recorded dialogue
 ```
 
 ## Performance

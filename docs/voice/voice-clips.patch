@@ -1,0 +1,79 @@
+diff --git a/src/engine/voice.js b/src/engine/voice.js
+index 279840a..c5f201c 100644
+--- a/src/engine/voice.js
++++ b/src/engine/voice.js
+@@ -15,6 +15,15 @@ export class VoiceSystem {
+     this.voices = [];
+     this.queue = Promise.resolve();
+     this.token = 0;
++    // recorded voice pack (assets/voice/manifest.json); lines without a clip fall back to speech synthesis
++    this.clips = new Map();   // game_text -> { file, radioBaked, ... }
++    this.bytes = new Map();   // file -> Promise<ArrayBuffer>
++    this.chain = Promise.resolve();
++    this.gen = 0;             // bumped by cancel()
++    fetch('assets/voice/manifest.json')
++      .then(r => (r.ok ? r.json() : null))
++      .then(m => { if (m) for (const l of Object.values(m.lines)) { this.clips.set(l.text, l); this.clipBytes(l); } })
++      .catch(() => { /* no voice pack */ });
+     const load = () => { try { this.voices = this.synth ? this.synth.getVoices() : []; } catch (e) { this.voices = []; } };
+     if (this.synth) { load(); try { this.synth.addEventListener('voiceschanged', load); } catch (e) { /* old API */ } }
+   }
+@@ -41,6 +50,49 @@ export class VoiceSystem {
+ 
+   // Say a line now; resolves when finished (or after an estimated duration).
+   say(kind, text, opts = {}) {
++    const clip = !opts.silent && this.settings.get('voice') && this.audio && this.audio.ready && this.clips.get(text);
++    return clip ? this.sayClip(kind, text, clip, opts) : this.saySynth(kind, text, opts);
++  }
++
++  clipBytes(l) {
++    let b = this.bytes.get(l.file);
++    if (!b) this.bytes.set(l.file, b = fetch('assets/voice/' + l.file).then(r => { if (!r.ok) throw new Error(l.file + ' ' + r.status); return r.arrayBuffer(); }));
++    return b;
++  }
++
++  // Recorded clips play one at a time, in call order (like speechSynthesis queues utterances).
++  sayClip(kind, text, clip, opts) {
++    const gen = this.gen;
++    const run = this.chain.then(() => (gen === this.gen ? this.playClip(kind, text, clip, opts, gen) : null));
++    this.chain = run.catch(() => { });
++    return run;
++  }
++
++  async playClip(kind, text, clip, opts, gen) {
++    const sp = SPEAKERS[kind] || SPEAKERS.officer, A = this.audio, c = A.ctx;
++    let buf;
++    // decodeAudioData detaches its input: decode a copy, keep the bytes for a replay (checkpoint restart)
++    try { buf = await c.decodeAudioData((await this.clipBytes(clip)).slice(0)); } catch (e) { return this.saySynth(kind, text, opts); }
++    if (gen !== this.gen) return;                                   // cancelled while decoding
++    const radio = sp.radio && !clip.radioBaked;
++    this.ui && this.ui.subtitle(opts.label || sp.label, text, sp.radio, buf.duration + 0.6);
++    if (radio) {
++      A.play('radioIn', { bus: 'voice', vol: 0.6, norand: true });
++      this._static = A.play('breath0', { bus: 'voice', vol: 0.12, loop: true, rate: 3.5, norand: true });
++    }
++    const src = c.createBufferSource(); src.buffer = buf;
++    const g = c.createGain(); g.gain.value = opts.vol ?? 1;
++    src.connect(g); g.connect(A.voice);
++    if (kind === 'swat' || kind === 'swat2') g.connect(A.revSend);  // shouted across the courtyard: give it the zone's reverb
++    src._gain = g; this.src = src;
++    await new Promise((res) => { src.onended = res; src.start(); });
++    if (this.src === src) this.src = null;
++    if (gen !== this.gen) return;                                   // cancel() already cleaned up
++    if (radio) { A.play('radioOut', { bus: 'voice', vol: 0.5, norand: true }); A.stop(this._static, 0.05); }
++    await new Promise(r => setTimeout(r, 150));
++  }
++
++  saySynth(kind, text, opts = {}) {
+     const sp = SPEAKERS[kind] || SPEAKERS.officer;
+     const est = Math.max(1.4, text.split(/\s+/).length * 0.36 / (sp.rate || 1)) + 0.25;
+     const token = ++this.token;
+@@ -78,7 +130,7 @@ export class VoiceSystem {
+     return p;
+   }
+ 
+-  cancel() { this.token++; try { this.synth && this.synth.cancel(); } catch (e) { /* ignore */ } this.audio && this.audio.stop(this._static, 0.05); this.ui && this.ui.subtitle(null); }
++  cancel() { this.gen++; this.audio && this.audio.stop(this.src, 0.03); this.src = null; this.token++; try { this.synth && this.synth.cancel(); } catch (e) { /* ignore */ } this.audio && this.audio.stop(this._static, 0.05); this.ui && this.ui.subtitle(null); }
+   pause() { try { this.synth && this.synth.pause(); } catch (e) { /* ignore */ } }
+   resume() { try { this.synth && this.synth.resume(); } catch (e) { /* ignore */ } }
+ }
