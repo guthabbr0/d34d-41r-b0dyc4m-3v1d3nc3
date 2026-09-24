@@ -173,7 +173,8 @@ export class Zombie {
         if (this.crawler) {
           // pounce from a few metres out when it has a clear line (kit windowLeap, scaled to the gap)
           const facing = (toP.x * Math.sin(this.yaw) + toP.z * Math.cos(this.yaw)) / Math.max(1e-4, dist);
-          if (dist < 3.1 && facing > 0.85 && direct && this.attackCd <= 0 && this.stagger <= 0 && player.alive) this.startPounce(dist);
+          if (dist < 3.1 && facing > 0.85 && this.attackCd <= 0 && this.stagger <= 0 && player.alive && (frame + this.id) % 3 === 0
+            && g.world.lineOfSight(_a.copy(this.pos).setY(0.6), _b.copy(player.pos).setY(0.6))) this.startPounce(dist);
         } else if (dist < (this.cane ? 1.45 : 1.25) && this.attackCd <= 0 && this.stagger <= 0 && player.alive) {
           this.state = 'attack'; this.attackT = 0; this.didHit = false;
           g.audio && g.audio.zombieVoice(this, 'attack');
@@ -258,11 +259,11 @@ export class Zombie {
           this.phase += dt * spd * 2.4;
           poseRun(p, this.phase);
         } else {
-          const stride = 0.55 + this.limp * 0.1;
+          const stride = this.arch && this.arch.stride ? 0.4 : 0.55 + this.limp * 0.1;
           this.phase += dt * spd / stride * Math.PI;
           const w = Math.min(1, spd / 0.4);
           const narrow = this.arch && this.arch.stride;      // pencil skirt: short, tight steps
-          poseShamble(p, this.phase, { reach: this.alert ? this.reach : this.reach * 0.3, limp: this.limp, stride: narrow ? narrow + spd * 0.05 : 0.34 + spd * 0.08, knee: narrow ? 0.65 : 0.9, lean: this.arch ? this.arch.lean : 0.3 });
+          poseShamble(p, this.phase, { reach: this.alert ? this.reach : this.reach * 0.3, limp: this.limp, stride: narrow ? Math.min(0.34, narrow + spd * 0.05) : 0.34 + spd * 0.08, knee: narrow ? 0.65 : 0.9, lean: this.arch ? this.arch.lean : 0.3 });
           if (w < 1) { const idle = this.tmpPose.clear(); poseIdle(idle, this.t, { seed: this.id }); p.blend(idle, 1 - w); }
         }
       }
@@ -342,7 +343,8 @@ export class Zombie {
       // twitching head and shoulders between bursts
       if (Math.random() < dt * 1.5) { this.react.impulse(BI.head, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 9); this.react.impulse(BI.chest, 0, (Math.random() - 0.5) * 5, 0); }
     }
-    if (a.stalker && direct && dist < 4.5 && dist > 1.3) { this.sprint = true; return 2.4; }
+    // the pencil skirt allows no running stride: she closes in with fast, tight steps
+    if (a.stalker && direct && dist < 4.5 && dist > 1.3) return 2.2;
     if (a.cane && direct && dist < 2.6) return 2.0;
     return 1;
   }

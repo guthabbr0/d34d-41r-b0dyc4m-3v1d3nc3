@@ -9,9 +9,12 @@ camera recorded.
 - **Footage look**: equidistant fisheye lens model with per-channel lateral chromatic aberration,
   sensor noise that rises with exposure gain, macroblocking in dark areas, lens dirt and rain drops,
   in-camera sharpening, eye adaptation, bloom, motion blur, filmic tone curve.
-- **Bodies**: infected are signed-distance-field sculpts meshed at load (skin, cloth layers, tears,
-  procedural wounds), skinned to a 20-bone skeleton, animated procedurally, with verlet ragdolls,
-  hit zones, head destruction and dynamic blood.
+- **Bodies**: the infected are the Ashworth enemy kit (worker, businessman, businesswoman,
+  grandmother, tactical officer and a crawler that pounces), re-posed at load onto a 20-bone
+  skeleton, animated procedurally with the kit's own clips for the leap and the cane, with verlet
+  ragdolls, hit zones, armour, head destruction and dynamic blood — see
+  [`docs/enemies/README.md`](docs/enemies/README.md). The procedural signed-distance-field bodies
+  remain as the fallback (`?enemies=sdf`).
 - **Cutscenes**: in-engine and in-camera — the intro drive (hands on the wheel, wipers, dispatch
   radio), the bite, the finale.
 - **Audio**: every sound is synthesised at load and played through a body-mic chain
@@ -48,7 +51,15 @@ query inside the SVG); `npm run icons` re-renders `favicon.ico` (16/32/48 px) an
 `apple-touch-icon.png` (180 px) from it.
 
 Debug URL parameters: `?q=low|medium|high|ultra` forces a preset, `?start=intro|cp0|cp1|cp2` jumps
-to a checkpoint, `?auto=1` skips the click-to-start gate.
+to a checkpoint, `?auto=1` skips the click-to-start gate, `?enemies=sdf` uses the procedural bodies
+instead of the enemy kit.
+
+## Enemies
+
+`assets/enemies/` is generated from the Ashworth Enemy Kit v2.0 by `node tools/import_enemy_kit.mjs
+[path/to/ashworth-enemy-kit-v2.0]` (needs ffmpeg; the source kit is not committed).
+[`docs/enemies/README.md`](docs/enemies/README.md) covers the cast, the re-posing and retargeting,
+the crawler, budgets and known limits, with screenshots.
 
 ## Voice-over
 
@@ -68,7 +79,7 @@ The repository is set up for Vercel's Git integration; pushing is all it takes.
 | framework | none (static site) |
 | install | `npm ci` (Node 22.x from `package.json` `engines`) |
 | build | `npm run build` |
-| output | `dist/web` — `index.html`, the content-hashed bundle, icons, `assets/` (about 13 MB) |
+| output | `dist/web` — `index.html`, the content-hashed bundle, icons, `assets/` (about 21 MB; a session loads the enemy meshes for its preset only) |
 | caching | bundle `immutable` for a year (its name changes with its content), assets a week with background revalidation, `index.html` revalidated on every visit |
 
 Any static host works the same way: run `npm run build` and publish `dist/web`.
@@ -77,12 +88,15 @@ Any static host works the same way: run `npm run build` and publish `dist/web`.
 
 ```
 src/engine   renderer + bodycam post chain, assets, audio synthesis, input, settings, SDF mesher
-src/game     level builder, portal culling, materials, props, player, weapons, zombies, ragdolls, fx, story
+src/game     level builder, portal culling, materials, props, player, weapons, zombies, ragdolls, fx, story,
+             enemy kit bodies (kitbody.js)
 src/ui       menus, HUD, settings panel
-assets/      Poly Haven textures, models and HDRIs (CC0), already simplified for the web
-tools/       build, asset fetch/simplify, headless screenshot harness, voice script checker
+assets/      Poly Haven textures, models and HDRIs (CC0), already simplified for the web;
+             enemies/ from the Ashworth enemy kit (MIT)
+tools/       build, asset fetch/simplify, enemy kit import, headless screenshot harness, voice script checker
 perf/        performance scenario, budget, gate and report — see perf/README.md
 docs/voice/  voice-over script, line data and integration guide for recorded dialogue
+docs/enemies/ enemy kit integration notes and screenshots
 ```
 
 ## Performance
@@ -95,7 +109,8 @@ that only touches the DOM when something changes.
 
 ## Credits
 
-Textures, models and HDRIs: [Poly Haven](https://polyhaven.com) (CC0). Engine:
+Textures, models and HDRIs: [Poly Haven](https://polyhaven.com) (CC0). Characters: Ashworth Enemy
+Kit v2.0 (MIT, notice in `assets/enemies/LICENSE-ASHWORTH.txt`). Engine:
 [three.js](https://threejs.org) (MIT). Fonts: Big Shoulders Display, IBM Plex Mono and IBM Plex
-Sans Condensed via Google Fonts (SIL Open Font License). Everything else — characters, sound,
-voice direction, level — is procedural and made for this project.
+Sans Condensed via Google Fonts (SIL Open Font License). Everything else — sound, voice direction,
+level, the fallback characters — is procedural and made for this project.

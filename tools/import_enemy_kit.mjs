@@ -42,8 +42,9 @@ const { buildGeometry } = await imp('core/geometry.js');
 const { samplePose, CLIPS } = await imp('core/animations.js');
 const { REGION_NAMES, FACE_LANDMARKS, REGIONS, ATLAS_SIZE } = await imp('core/atlas.js');
 
-// clips the game plays (src/game/kitclips.js); everything else is procedural in src/game/anim.js
-const CLIP_SET = { crawler: ['crawl', 'frenzy', 'windowLeap'], grandmother: ['caneWalk', 'caneAttack'] };
+// clips the game plays (src/game/kitbody.js KitClip); everything else is procedural in src/game/anim.js
+// (the kit's crawl is replaced by the IK crawl there; its leap is the crawler's pounce)
+const CLIP_SET = { crawler: ['windowLeap'], grandmother: ['caneWalk', 'caneAttack'] };
 // bones stored per clip frame: the ones that map onto the game skeleton, plus the cane
 const CLIP_BONES = ['Root', 'Hips', 'Spine', 'Chest', 'Neck', 'Head', 'Jaw',
   'L_Clavicle', 'L_UpperArm', 'L_Forearm', 'L_Hand', 'R_Clavicle', 'R_UpperArm', 'R_Forearm', 'R_Hand',
