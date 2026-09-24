@@ -91,6 +91,9 @@ class App {
     const assets = new Assets(this.renderer);
     assets.lowTex = this.settings.get('lowTex');
     assets.texCap = this.settings.get('texCap') || 1024;
+    // enemy kit (?enemies=sdf restores the procedural bodies): full mesh from HIGH up, kit LOW below
+    assets.enemyKit = q.get('enemies') !== 'sdf';
+    assets.enemyLods = [this.settings.get('bodyDetail') >= 2 ? 'medium' : 'low', 'far'];
     assets.anisotropy = Math.min(this.renderer.maxAnisotropy, { low: 2, medium: 4, high: 8, ultra: 16 }[this.settings.get('quality')] || 4);
     this.assets = assets;
     await assets.loadAll((p, l) => ui.loadProgress(p * 0.45, 'Decoding textures and props'));

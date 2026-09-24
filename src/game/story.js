@@ -169,7 +169,8 @@ export class Story {
     const g = this.game, L = g.level, S = L.spawns, T = g.templates;
     // emitters: fire alarm in the lobby, TV static in 1C
     this.emitters.push(g.audio && g.audio.emitter('fireAlarm', V3(4.6, 2.3, -2.2), 0.55, { ref: 3, rolloff: 1.2 }));
-    this.emitters.push(g.audio && g.audio.emitter('breath0', V3(1.2, 0.9, -11.4), 0.2, { ref: 1.2, rolloff: 2 }));
+    const tvBuf = (g.audio && g.audio.buffers && g.audio.buffers.tvStatic) ? 'tvStatic' : 'breath0';
+    this.emitters.push(g.audio && g.audio.emitter(tvBuf, V3(1.2, 0.9, -11.4), 0.2, { ref: 1.2, rolloff: 2 }));
     this.setDressing();
     // bodies that are always there
     g.spawnCorpse(L.markers.lobbyCorpse, 1.2, T[3 % T.length], { keep: true, wounds: 4, pool: 1.4 });
@@ -317,7 +318,8 @@ export class Story {
     ui.showOverlay(true, false);
     this.app.muteWorld(false);
     this.siren = A && A.play('siren', { vol: 0.25, loop: true, norand: true, bus: 'amb' });
-    this.engine = A && A.play('breath1', { vol: 0.25, loop: true, rate: 0.35, norand: true, bus: 'amb' });
+    const idleBuf = (A && A.buffers && A.buffers.carIdle) ? 'carIdle' : 'breath1';
+    this.engine = A && A.play(idleBuf, { vol: 0.25, loop: true, rate: idleBuf === 'carIdle' ? 1 : 0.35, norand: true, bus: 'amb' });
     await this.wait(0.8);
     await this.say('dispatch', 'Twenty-one Adam fourteen, Keston. Respond code three, twenty-two fifty Wexley Avenue, Harlan Court Apartments, unit one-C.');
     await this.say('dispatch', 'Multiple callers reporting screaming and an assault in progress. Caller advises the suspect is biting the victim.');
@@ -835,8 +837,9 @@ export class Story {
 
   makeSwat(pos) {
     const g = this.game;
-    const mat = makeCharacterMaterial(g.assets, g.swatTemplate.opts.mat);
-    const body = new Body(g.swatTemplate, mat);
+    const tpl = g.swatTemplate;
+    const mat = tpl.makeMaterial ? tpl.makeMaterial() : makeCharacterMaterial(g.assets, tpl.opts.mat);
+    const body = new Body(tpl, mat);
     body.eyeMat.color.set(0x333333);
     // rifle
     const rifle = new THREE.Group();
@@ -898,9 +901,10 @@ export class Story {
         const d = to.length();
         if (d > 0.9) { z.pos.addScaledVector(to.normalize(), dt * 1.0); z.vel.set(0, 0, 0); }
         z.yaw = Math.atan2(p.pos.x - z.pos.x, p.pos.z - z.pos.z);
-        const pose = new Pose();
-        if (d > 0.9) { z.phase += dt * 5; poseShamble(pose, z.phase, { reach: 0.8 }); } else poseFeed(pose, z.t);
-        applyPose(z.body, pose); z.root.position.copy(z.pos); z.root.rotation.set(0, z.yaw, 0);
+        // the zombie's own gait (crawlers crawl, the grandmother hobbles), then it feeds
+        if (d > 0.9) z.vel.set(Math.sin(z.yaw), 0, Math.cos(z.yaw)); else z.vel.set(0, 0, 0);
+        z.state = d > 0.9 ? 'chase' : 'feed';
+        z._animate(dt);
         return true;
       };
       A && A.zombieVoice(killer, 'feed');

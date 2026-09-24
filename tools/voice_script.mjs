@@ -33,6 +33,35 @@ for (const l of doc.lines) {
 }
 for (const c of calls) if (!doc.lines.some(l => l.game_text === c.text)) errors.push(`story.js line has no entry in lines.json: ${c.kind} "${c.text}"`);
 
+// --------------------------------------------------------- recorded clip pack
+// The game looks a clip up by the exact game_text string, so a typo in the
+// manifest silently reverts exactly ONE line to speech synthesis and nothing
+// else notices. Verify the pack against disk and against lines.json.
+const manPath = path.join(root, 'assets/voice/manifest.json');
+if (fs.existsSync(manPath)) {
+  const man = JSON.parse(fs.readFileSync(manPath, 'utf8'));
+  const seen = new Set();
+  for (const l of doc.lines) {
+    const e = man.lines && man.lines[l.id];
+    if (!e) { errors.push(`${l.id}: missing from assets/voice/manifest.json`); continue; }
+    seen.add(l.id);
+    if (e.text !== l.game_text) {
+      errors.push(`${l.id}: manifest text differs from game_text — this line would fall back to speech synthesis\n    manifest: ${JSON.stringify(e.text)}\n    game:     ${JSON.stringify(l.game_text)}`);
+    }
+    const f = path.join(root, 'assets/voice', e.file || '');
+    if (!e.file || !fs.existsSync(f)) errors.push(`${l.id}: clip missing on disk: ${e.file}`);
+    if (!e.duration) errors.push(`${l.id}: manifest has no duration (the game waits on it)`);
+    if (l.max_seconds && e.duration && e.duration > l.max_seconds + 0.05) {
+      errors.push(`${l.id}: ${e.duration}s exceeds its hard cap ${l.max_seconds}s`);
+    }
+  }
+  for (const id of Object.keys(man.lines || {})) if (!seen.has(id)) errors.push(`manifest has an unknown line id: ${id}`);
+  const packed = Object.keys(man.lines || {}).length;
+  if (!errors.length) console.log(`voice: clip pack ok — ${packed} clips, all files present, text matches game_text`);
+} else {
+  console.log('voice: no assets/voice/manifest.json — the game will use speech synthesis');
+}
+
 if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
 console.log(`voice: ${doc.lines.length} lines match ${calls.length} spoken strings in story.js`);
 if (process.argv.includes('--check')) process.exit(0);

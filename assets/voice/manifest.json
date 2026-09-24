@@ -1,0 +1,335 @@
+{
+ "version": 1,
+ "lines": {
+  "INT-01": {
+   "file": "int-01.mp3",
+   "text": "Twenty-one Adam fourteen, Keston. Respond code three, twenty-two fifty Wexley Avenue, Harlan Court Apartments, unit one-C.",
+   "radioBaked": false,
+   "duration": 7.03,
+   "score": 0.909,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "INT-02": {
+   "file": "int-02.mp3",
+   "text": "Multiple callers reporting screaming and an assault in progress. Caller advises the suspect is biting the victim.",
+   "radioBaked": false,
+   "duration": 7.05,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "INT-03": {
+   "file": "int-03.mp3",
+   "text": "Adam fourteen copies. I'm about a minute out.",
+   "radioBaked": false,
+   "duration": 3.55,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "INT-04": {
+   "file": "int-04.mp3",
+   "text": "Fourteen, be advised, we're holding six similar calls across the east district. Your backup is delayed.",
+   "radioBaked": false,
+   "duration": 6.09,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "INT-05": {
+   "file": "int-05.mp3",
+   "text": "...Copy.",
+   "radioBaked": false,
+   "duration": 0.65,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "INT-06": {
+   "file": "int-06.mp3",
+   "text": "Adam fourteen, on scene.",
+   "radioBaked": false,
+   "duration": 1.57,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "INT-07": {
+   "file": "int-07.mp3",
+   "text": "Copy fourteen, on scene at zero three fourteen.",
+   "radioBaked": false,
+   "duration": 3.29,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "LOB-01": {
+   "file": "lob-01.mp3",
+   "text": "Police department! Anybody hurt in here? Call out!",
+   "radioBaked": false,
+   "duration": 3.53,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "1C-01": {
+   "file": "1c-01.mp3",
+   "text": "Police! Get away from him!",
+   "radioBaked": false,
+   "duration": 1.83,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "1C-02": {
+   "file": "1c-02.mp3",
+   "text": "Show me your hands! Now!",
+   "radioBaked": false,
+   "duration": 3.08,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "1C-03": {
+   "file": "1c-03.mp3",
+   "text": "Agh! It bit me! Get off!",
+   "radioBaked": false,
+   "duration": 2.48,
+   "score": 0.833,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "1C-04": {
+   "file": "1c-04.mp3",
+   "text": "Dispatch, Adam fourteen. Shots fired, suspect down. Victim is... he's not breathing.",
+   "radioBaked": false,
+   "duration": 8.44,
+   "score": 0.955,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "1C-05": {
+   "file": "1c-05.mp3",
+   "text": "Fourteen, say again? Are you injured?",
+   "radioBaked": false,
+   "duration": 4.18,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "1C-06": {
+   "file": "1c-06.mp3",
+   "text": "Dispatch... fourteen. I've been bitten. The victim got back up. They don't stop. Send everything you've got.",
+   "radioBaked": false,
+   "duration": 11.49,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "1C-07": {
+   "file": "1c-07.mp3",
+   "text": "Copy fourteen. SWAT is staging on Pell Street. Can you get to the rear courtyard? They'll come in through the alley.",
+   "radioBaked": false,
+   "duration": 5.72,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "1C-08": {
+   "file": "1c-08.mp3",
+   "text": "Rear courtyard. Copy.",
+   "radioBaked": false,
+   "duration": 2.19,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "CP1-01": {
+   "file": "cp1-01.mp3",
+   "text": "Maintenance door, east end. Move.",
+   "radioBaked": false,
+   "duration": 2.95,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "MNT-01": {
+   "file": "mnt-01.mp3",
+   "text": "That's a shotgun on the bench.",
+   "radioBaked": false,
+   "duration": 1.44,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "CRT-01": {
+   "file": "crt-01.mp3",
+   "text": "Fourteen, SWAT is two minutes out. Hold the courtyard. They're coming through the alley.",
+   "radioBaked": false,
+   "duration": 4.47,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "CRT-02": {
+   "file": "crt-02.mp3",
+   "text": "Sixty seconds, fourteen. Hang on.",
+   "radioBaked": false,
+   "duration": 2.04,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "CRT-03": {
+   "file": "crt-03.mp3",
+   "text": "Thirty seconds. Units are on Pell.",
+   "radioBaked": false,
+   "duration": 1.96,
+   "score": 0.8,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "CRT-04": {
+   "file": "crt-04.mp3",
+   "text": "SWAT is entering the alley. Do not fire toward the gate.",
+   "radioBaked": false,
+   "duration": 3.47,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "END-01": {
+   "file": "end-01.mp3",
+   "text": "Fourteen, SWAT has the rear gate. Walk to them, keep your hands where they can see them.",
+   "radioBaked": false,
+   "duration": 5.3,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  },
+  "END-02": {
+   "file": "end-02.mp3",
+   "text": "Keston SWAT! Drop the weapon! Drop it now!",
+   "radioBaked": false,
+   "duration": 3.6,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Milo",
+   "channel": "distant-outdoor"
+  },
+  "END-03": {
+   "file": "end-03.mp3",
+   "text": "I'm a police officer! Twenty-one Adam fourteen!",
+   "radioBaked": false,
+   "duration": 4.68,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "END-04": {
+   "file": "end-04.mp3",
+   "text": "Show me your arm. Your left arm. Show me, now!",
+   "radioBaked": false,
+   "duration": 4.75,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "voicedesign",
+   "channel": "distant-outdoor"
+  },
+  "END-05": {
+   "file": "end-05.mp3",
+   "text": "It's... it's nothing. I'm fine.",
+   "radioBaked": false,
+   "duration": 3.81,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Dean",
+   "channel": "body-mic"
+  },
+  "END-06": {
+   "file": "end-06.mp3",
+   "text": "He's bit! He's bit! Get on the ground! On the ground!",
+   "radioBaked": false,
+   "duration": 4.62,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Milo",
+   "channel": "distant-outdoor"
+  },
+  "END-07": {
+   "file": "end-07.mp3",
+   "text": "Stop! STOP!",
+   "radioBaked": false,
+   "duration": 1.18,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "voicedesign",
+   "channel": "distant-outdoor"
+  },
+  "END-08": {
+   "file": "end-08.mp3",
+   "text": "Shots fired, shots fired. Suspect down.",
+   "radioBaked": false,
+   "duration": 3.34,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Milo",
+   "channel": "distant-outdoor"
+  },
+  "END-09": {
+   "file": "end-09.mp3",
+   "text": "Wait... that's fourteen. That's one of ours.",
+   "radioBaked": false,
+   "duration": 3.74,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "voicedesign",
+   "channel": "distant-outdoor"
+  },
+  "END-10": {
+   "file": "end-10.mp3",
+   "text": "Dispatch, SWAT one. We need a supervisor and a coroner at twenty-two fifty Wexley, rear alley.",
+   "radioBaked": false,
+   "duration": 5.85,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Milo",
+   "channel": "radio"
+  },
+  "END-11": {
+   "file": "end-11.mp3",
+   "text": "...Copy, SWAT one.",
+   "radioBaked": false,
+   "duration": 0.57,
+   "score": 1.0,
+   "verdict": "ok",
+   "voice": "Chloe",
+   "channel": "radio"
+  }
+ }
+}

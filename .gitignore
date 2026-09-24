@@ -5,3 +5,5 @@ dist/
 .DS_Store
 perf/run-*/*.png
 perf/run-*/*.cpuprofile
+# source enemy kit (108 MB); tools/import_enemy_kit.mjs converts it into assets/enemies/
+ashworth-enemy-kit-v2.0/

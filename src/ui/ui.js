@@ -53,7 +53,7 @@ const SETTINGS_SCHEMA = {
     { key: 'sfx', label: 'Effects', type: 'range', min: 0, max: 1.5, step: 0.05, fmt: v => `${Math.round(v * 100)} %` },
     { key: 'ambience', label: 'Ambience', type: 'range', min: 0, max: 1.5, step: 0.05, fmt: v => `${Math.round(v * 100)} %` },
     { key: 'voiceVol', label: 'Voices', type: 'range', min: 0, max: 1.5, step: 0.05, fmt: v => `${Math.round(v * 100)} %` },
-    { key: 'voice', label: 'Spoken dialogue', hint: 'Uses your device’s speech voices. Subtitles are always on.', type: 'toggle' },
+    { key: 'voice', label: 'Spoken dialogue', hint: 'Recorded cast where available, otherwise your device’s speech voices. Subtitles are always on.', type: 'toggle' },
   ],
 };
 

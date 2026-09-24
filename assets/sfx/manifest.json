@@ -1,0 +1,11 @@
+{
+ "radioIn": "radioIn.mp3",
+ "radioOut": "radioOut.mp3",
+ "radioStatic": "radioStatic.mp3",
+ "rain": "rain.mp3",
+ "beep": "beep.mp3",
+ "siren": "siren.mp3",
+ "fireAlarm": "fireAlarm.mp3",
+ "carIdle": "carIdle.mp3",
+ "tvStatic": "tvStatic.mp3"
+}
