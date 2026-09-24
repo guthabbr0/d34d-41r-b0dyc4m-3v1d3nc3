@@ -11,7 +11,7 @@ export const ZONE_RECTS = [
   ['lot', -17, 0, 17, 13],
   // locked rooms (stairwell, storage, 1A, 1D): no openings but their closed doors
   ['sealed', -15, -8, -9, 0], ['sealed', 5, -8, 9, 0], ['sealed', -15, -19.7, -8.5, -10.4], ['sealed', -8.5, -19.7, -2.5, -15.5], ['sealed', 5.5, -15, 12.6, -10.4],
-  ['street', -300, 13, 150, 80],
+  ['street', -300, 13, 220, 80],   // the intro drive starts at x = 150
 ];
 
 export const ZONE_ADJ = {

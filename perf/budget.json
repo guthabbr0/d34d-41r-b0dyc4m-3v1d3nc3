@@ -1,5 +1,5 @@
 {
-  "frameJsMsP95": 8,
+  "frameJsMsP95": 12,
   "timerJsMsPerSec": 100,
   "drawsPerFrame": 150,
   "trisPerFrame": 300000,
@@ -7,7 +7,7 @@
   "syncQueriesPerFrame": 0,
   "attribLookupsPerFrame": 0,
   "uniformCallsPerFrame": 1100,
-  "programSwitchesPerFrame": 40,
+  "programSwitchesPerFrame": 60,
   "domMutationsPerSec": 30,
   "layoutsPerSec": 10,
   "audioNodesPerSec": 60,

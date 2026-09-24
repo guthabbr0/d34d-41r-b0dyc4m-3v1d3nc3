@@ -1,5 +1,5 @@
-// Perf gate: fails (exit 1) when a gated phase of a webgl_probe report carries budget flags.
-//   node perf/gate.mjs perf/run-N/report.json [--phases heavy,lot] [--baseline perf/run-M/report.json]
+// Perf gate: fails (exit 1) when a gated phase of a webgl_probe report exceeds the frozen budget.json.
+//   node perf/gate.mjs perf/run-N/report.json [--phases heavy,lot] [--budget perf/budget.json] [--baseline perf/run-M/report.json]
 // With --baseline it also fails when a profiled function's self time in the heavy phase grew >20 %
 // (ignoring functions under 5 ms, which are sampling noise at 0.5 ms intervals).
 import fs from 'node:fs';
@@ -11,17 +11,31 @@ const opt = (k, d) => opts[k] ?? d;
 if (!file) { console.log('usage: node perf/gate.mjs <report.json> [--phases heavy,lot] [--baseline <report.json>]'); process.exit(2); }
 
 const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+const budget = JSON.parse(fs.readFileSync(opt('budget', new URL('budget.json', import.meta.url)), 'utf8'));
 const gated = opt('phases', 'heavy').split(',');
-// Flags that SwiftShader produces on any machine and that do not describe the shipped game:
-// long tasks come from the software rasteriser stalling the main thread on readbacks it schedules.
-const IGNORE = [/long tasks/];
+// thresholds come from the frozen budget.json (not the flags stored in the report at probe time)
+const checks = [
+  ['main-thread JS p95 ms', p => p.jsMsP95, budget.frameJsMsP95],
+  ['draw calls / frame', p => p.drawsPerFrame, budget.drawsPerFrame],
+  ['triangles / frame', p => p.trisPerFrame, budget.trisPerFrame],
+  ['upload KB / frame', p => p.uploadKbPerFrame, budget.uploadKbPerFrame],
+  ['sync GL queries / frame', p => p.syncQueriesPerFrame, budget.syncQueriesPerFrame],
+  ['location lookups / frame', p => p.locationLookupsPerFrame, budget.attribLookupsPerFrame],
+  ['uniform calls / frame', p => p.uniformCallsPerFrame, budget.uniformCallsPerFrame],
+  ['program switches / frame', p => p.programSwitchesPerFrame, budget.programSwitchesPerFrame],
+  ['DOM mutations / s', p => p.domMutationsPerSec, budget.domMutationsPerSec],
+  ['layouts / s', p => p.layoutsPerSec, budget.layoutsPerSec],
+  ['WebAudio nodes / s', p => p.audioNodesPerSec, budget.audioNodesPerSec],
+  ['JS heap growth MB', p => p.heapMbEnd - p.heapMbStart, budget.heapGrowthMbPerPhase],
+  ['shader compiles', p => p.shaderCompiles, budget.shaderCompilesSteadyState],
+];
 let failed = 0;
 for (const p of report.phases) {
   if (!gated.includes(p.phase)) continue;
-  const flags = p.flags.filter(f => !IGNORE.some(r => r.test(f)));
-  console.log(`${p.phase}: ${flags.length ? 'FAIL' : 'ok'}  draws ${p.drawsPerFrame.toFixed(0)} · tris ${(p.trisPerFrame / 1000).toFixed(0)}k · JS p95 ${p.jsMsP95.toFixed(1)} ms · upload ${p.uploadKbPerFrame.toFixed(0)} KB · DOM ${p.domMutationsPerSec.toFixed(0)}/s`);
-  for (const f of flags) console.log('   - ' + f);
-  failed += flags.length;
+  const bad = checks.filter(([, f, lim]) => lim !== undefined && f(p) > lim);
+  console.log(`${p.phase}: ${bad.length ? 'FAIL' : 'ok'}  draws ${p.drawsPerFrame.toFixed(0)} · tris ${(p.trisPerFrame / 1000).toFixed(0)}k · JS p95 ${p.jsMsP95.toFixed(1)} ms · upload ${p.uploadKbPerFrame.toFixed(0)} KB · DOM ${p.domMutationsPerSec.toFixed(0)}/s`);
+  for (const [name, f, lim] of bad) console.log(`   - ${name} ${f(p).toFixed(1)} > ${lim}`);
+  failed += bad.length;
 }
 
 const basePath = opt('baseline');

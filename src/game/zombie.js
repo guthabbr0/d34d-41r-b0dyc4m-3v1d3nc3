@@ -368,6 +368,7 @@ export class Zombie {
     this.game.scene.remove(this.root);
     this.material.dispose();
     this.body.eyeMat.dispose();
+    this.body.skeleton.dispose();   // frees the per-body bone texture (geometry is shared by the template)
     if (this.bloodPool) { this.bloodPool.parent && this.bloodPool.parent.remove(this.bloodPool); }
   }
 }
